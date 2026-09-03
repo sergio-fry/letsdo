@@ -1,0 +1,37 @@
+# CI for the letsdo gem.
+#
+# Runs on every push to any branch:
+#   1. Build check: the gem assembles cleanly (gem build letsdo.gemspec).
+#   2. Tests: rake test ends with 0 failures, 0 errors.
+#
+# Tests use only the built-in Minitest (rake and minitest ship as default
+# gems with Ruby), so the workflow runs on a clean Ruby — no bundle install.
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Explicit Ruby 3.x — satisfies letsdo.gemspec
+        # required_ruby_version: ">= 3.0".
+        ruby: ["3.3"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+
+      - name: Build gem
+        run: gem build letsdo.gemspec
+
+      - name: Run tests
+        run: rake test
