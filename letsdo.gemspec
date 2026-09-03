@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
 
   spec.summary     = "Локальный агент-работник задач Backlog.md/markdown"
   spec.description = "letsdo — локальный агент-работник задач Backlog.md/markdown. " \
-                     "ООП-структура: Letsdo::PromptStore (.agents/), Letsdo::OutputStreamer " \
+                     "ООП-структура: Letsdo::PromptStore (agents/), Letsdo::OutputStreamer " \
                      "и Letsdo::PiRunner (pi --mode json), Letsdo::Agent (один прогон), " \
                      "Letsdo::Loop (цикл оркестратора), Letsdo::CLI. Тесты на Minitest. " \
                      "В будущем выделяется в отдельный репозиторий."
