@@ -8,13 +8,20 @@ module Letsdo
   #   stderr — служебные строки: вызовы инструментов (имя, параметры,
   #            результат) как прогресс выполнения.
   #
-  # Формат служебных строк инструментов:
-  #   ⚙ имя: параметры             — вызов инструмента одной строкой
-  #                                   (для bash — текст команды, для
-  #                                   read/write/edit — путь и т.п.);
-  #   строки с отступом «  »        — результат выполнения (stdout/stderr);
-  #   ✖ Ошибка: ...                 — результат-ошибка помечен явно;
-  #   … [вывод обрезан: N строк, M] — очень большой вывод сводится к сводке.
+  # Каждая строка-действие пишется с единым префиксом времени HH:MM:SS:
+  # по разнице префиксов видно, как давно произошло действие и сколько
+  # длился инструмент. Формат служебных строк инструментов:
+  #   HH:MM:SS ⚙ имя: параметры       — вызов инструмента одной строкой
+  #                                      (для bash — текст команды, для
+  #                                      read/write/edit — путь и т.п.);
+  #   строки с отступом «  »           — результат выполнения
+  #                                      (stdout/stderr), без префикса
+  #                                      времени (это данные, не действия);
+  #   HH:MM:SS ✓ имя: завершено (Xs)   — завершение инструмента (успех),
+  #                                      пишется после блока результата;
+  #   HH:MM:SS ✖ имя: ошибка (Xs)      — завершение инструмента (ошибка);
+  #   ✖ Ошибка: ...                    — результат-ошибка помечен явно;
+  #   … [вывод обрезан: N строк, M]    — большой вывод → сводка-заметка.
   # Запоминает последний символ ответа, чтобы при завершении гарантировать
   # финальный перевод строки — вывод не должен обрываться посередине.
   class OutputStreamer
@@ -27,10 +34,14 @@ module Letsdo
 
     # @param stdout [IO] поток текста ответа агента
     # @param stderr [IO] поток служебных строк
-    def initialize(stdout: $stdout, stderr: $stderr)
+    # @param clock [Proc] callable → Time, источник времени для префиксов
+    #        (инжектируется в тестах для детерминированных HH:MM:SS)
+    def initialize(stdout: $stdout, stderr: $stderr, clock: nil)
       @stdout = stdout
       @stderr = stderr
+      @clock = clock || -> { Time.now }
       @last_char = nil
+      @action_started_at = nil
     end
 
     # Печатает порцию текста ответа агента немедленно.
@@ -44,39 +55,46 @@ module Letsdo
       @last_char = delta[-1]
     end
 
-    # Служебная строка о вызове инструмента: имя и краткие параметры
-    # (например, текст выполняемой команды bash). Одна строка без пустых
-    # заготовок, в stderr, чтобы не смешиваться с текстом агента в stdout.
+    # Служебная строка о вызове инструмента: префикс времени HH:MM:SS,
+    # имя и краткие параметры (например, текст выполняемой команды bash).
+    # Одна строка без пустых заготовок, в stderr, чтобы не смешиваться
+    # с текстом агента в stdout. Момент вызова запоминается — по нему
+    # считается длительность действия в строке завершения.
     #
     # @param name [String] имя инструмента
     # @param args [Hash, String, nil] параметры вызова (событие pi)
     def tool_start(name, args: nil)
-      line = +"⚙ #{name}"
+      @action_started_at = @clock.call
+      line = +"#{timestamp} ⚙ #{name}"
       summary = summarize_args(name, args)
       line << ": #{summary}" if summary
       write_service("#{line}\n")
     end
 
-    # Служебные строки результата инструмента (вывод команды/файла).
+    # Служебные строки результата инструмента (вывод команды/файла):
+    # блок с отступом без префикса времени (данные действия) + строка
+    # завершения с префиксом HH:MM:SS, именем, вердиктом и длительностью.
     # Очень большой вывод аккуратно обрезается с заметкой-сводкой, ошибки
-    # помечаются явно. Пустой результат ничего не выводит.
+    # помечаются явно. Пустой результат даёт только строку завершения.
     #
+    # @param name [String] имя инструмента
     # @param text [String] текст результата
     # @param error [Boolean] признак ошибки выполнения
-    def tool_result(text, error: false)
-      return if text.nil? || text.empty?
-
-      lines = text.lines
-      kept, truncated = truncate_result(text)
+    def tool_result(name, text, error: false)
       out = String.new
-      kept.each_with_index do |line, index|
-        line = line.chomp
-        next if line.empty? && index == kept.length - 1 # без хвостовой пустой строки
+      unless text.nil? || text.empty?
+        lines = text.lines
+        kept, truncated = truncate_result(text)
+        kept.each_with_index do |line, index|
+          line = line.chomp
+          next if line.empty? && index == kept.length - 1 # без хвостовой пустой строки
 
-        prefix = index.zero? ? (error ? "  ✖ Ошибка: " : "  ") : "  "
-        out << "#{prefix}#{line}\n"
+          prefix = index.zero? ? (error ? "  ✖ Ошибка: " : "  ") : "  "
+          out << "#{prefix}#{line}\n"
+        end
+        out << result_note(lines) if truncated
       end
-      out << result_note(lines) if truncated
+      out << completion_line(name, error)
       write_service(out)
     end
 
@@ -90,6 +108,44 @@ module Letsdo
     end
 
     private
+
+    # Единый префикс времени для всех строк-действий: HH:MM:SS.
+    #
+    # @return [String] локальное время как часы:минуты:секунды
+    def timestamp
+      @clock.call.strftime("%H:%M:%S")
+    end
+
+    # Строка завершения инструмента: префикс времени, вердикт, имя и
+    # длительность действия (секунды между вызовом и завершением).
+    # Длительность не выводится, если начало действия не зафиксировано
+    # (например, результат без предшествующего вызова).
+    #
+    # @param name [String] имя инструмента
+    # @param error [Boolean] признак ошибки
+    # @return [String] строка завершения с переводом строки
+    def completion_line(name, error)
+      mark = error ? "✖" : "✓"
+      verdict = error ? "ошибка" : "завершено"
+      elapsed = elapsed_seconds
+      duration = elapsed ? " (#{format_elapsed(elapsed)})" : ""
+      "#{timestamp} #{mark} #{name}: #{verdict}#{duration}\n"
+    end
+
+    # Секунды от начала текущего действия до завершения.
+    #
+    # @return [Float, nil] длительность или nil, если начала не было
+    def elapsed_seconds
+      return nil unless @action_started_at
+
+      @clock.call - @action_started_at
+    end
+
+    # Аккуратная длительность: секунды с одним знаком после запятой до 10с,
+    # целые секунды — после.
+    def format_elapsed(seconds)
+      seconds < 10 ? format("%.1fs", seconds) : "#{seconds.round}s"
+    end
 
     # Обрезает текст результата по лимитам строк и символов.
     #

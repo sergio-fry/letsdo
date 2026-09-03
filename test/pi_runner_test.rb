@@ -73,9 +73,17 @@ class PiRunnerTest < Minitest::Test
   def test_tool_header_shows_name_and_command
     run_pi(prompt: "Ты агент")
 
-    # Заголовок вызова: имя инструмента и текст команды bash.
+    # Заголовок вызова: префикс времени, имя инструмента и текст команды bash.
+    assert_match(/\A\d{2}:\d{2}:\d{2} ⚙ bash: ls -la\n/, @err.string)
     assert_includes @err.string, "⚙ bash: ls -la"
     assert_equal "Привет, мир!\n", @out.string
+  end
+
+  def test_tool_completion_has_time_prefix_and_elapsed
+    run_pi(prompt: "Ты агент")
+
+    # Завершение: префикс времени, вердикт, имя и длительность.
+    assert_match(/\n\d{2}:\d{2}:\d{2} ✓ bash: завершено \(\d+(\.\d+)?s\)\n\z/, @err.string)
   end
 
   def test_tool_result_goes_to_stderr
