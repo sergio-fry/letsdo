@@ -1,0 +1,121 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+#
+# Фейковый pi для тестов Letsdo::PiRunner / Letsdo::Agent / Letsdo::CLI.
+#
+# Ведёт себя как pi --mode json для детерминированных сценариев:
+#   - принимает те же аргументы: --mode json [флаги] <промпт>;
+#   - пишет в stdout построчный JSON-поток событий, как настоящий pi;
+#   - по умолчанию завершается с кодом 0 (либо FAKE_PI_EXIT).
+#
+# Управление (через окружение):
+#   FAKE_PI_EXIT        код выхода (по умолчанию 0)
+#   FAKE_PI_ARGV_FILE   путь: если задан, туда пишется ARGV.join("|") —
+#                       для проверки порядка аргументов (флаги, промпт)
+#   FAKE_PI_SCENARIO    содержимое потока событий:
+#                       default — текст + успешный вызов bash;
+#                       error   — текст + вызов bash с ошибкой (isError);
+#                       big     — текст + вызов bash с большим выводом
+#                                  (проверка обрезки результата);
+#                       stub    — только toolcall_start без событий
+#                                  выполнения (проверка фолбэка «⚙ имя»).
+#
+
+require "json"
+
+if (argv_file = ENV["FAKE_PI_ARGV_FILE"])
+  File.write(argv_file, ARGV.join("|"))
+end
+
+def toolcall_start(id, name)
+  {
+    "type" => "message_update",
+    "usage" => { "input" => 0, "output" => 0 },
+    "assistantMessageEvent" => { "type" => "toolcall_start", "contentIndex" => 1 },
+    "id" => id,
+    "toolName" => name
+  }
+end
+
+def toolcall_end(id, name, args)
+  {
+    "type" => "message_update",
+    "usage" => { "input" => 0, "output" => 0 },
+    "assistantMessageEvent" => {
+      "type" => "toolcall_end",
+      "contentIndex" => 1,
+      "toolCall" => { "id" => id, "name" => name, "arguments" => args }
+    }
+  }
+end
+
+def execution_start(id, name, command)
+  { "type" => "tool_execution_start", "toolCallId" => id, "toolName" => name, "args" => { "command" => command } }
+end
+
+def execution_end(id, name, result, is_error)
+  { "type" => "tool_execution_end", "toolCallId" => id, "toolName" => name, "result" => result, "isError" => is_error }
+end
+
+text_deltas = [
+  { "type" => "message_update", "assistantMessageEvent" => { "type" => "text_delta", "delta" => "Привет, " } },
+  { "type" => "message_update" },
+  { "type" => "message_update", "assistantMessageEvent" => { "type" => "text_delta", "delta" => "" } },
+  { "type" => "message_update", "assistantMessageEvent" => { "type" => "text_delta", "delta" => "мир!" } }
+]
+
+base_events = [
+  "это не JSON",
+  { "type" => "other_event", "data" => 1 }
+]
+
+scenario = ENV.fetch("FAKE_PI_SCENARIO", "default")
+
+events =
+  case scenario
+  when "default", ""
+    base_events + text_deltas + [
+      toolcall_start("call-1", "bash"),
+      toolcall_end("call-1", "bash", { "command" => "ls -la" }),
+      execution_start("call-1", "bash", "ls -la"),
+      execution_end("call-1", "bash",
+                    { "content" => [{ "type" => "text", "text" => "total 8\ndrwxr-xr-x  root root\n" }], "details" => {} },
+                    false),
+      { "type" => "agent_end", "messages" => [] }
+    ]
+  when "error"
+    base_events + text_deltas + [
+      toolcall_start("call-2", "bash"),
+      toolcall_end("call-2", "bash", { "command" => "ls /nonexistent" }),
+      execution_start("call-2", "bash", "ls /nonexistent"),
+      execution_end("call-2", "bash",
+                    { "content" => [
+                      { "type" => "text", "text" => "ls: cannot access '/nonexistent': No such file or directory\nCommand exited with code 2" }
+                    ], "details" => {} },
+                    true),
+      { "type" => "agent_end", "messages" => [] }
+    ]
+  when "big"
+    output = (1..300).map { |i| format("line %03d: xyz", i) }.join("\n")
+    base_events + text_deltas + [
+      toolcall_start("call-3", "bash"),
+      toolcall_end("call-3", "bash", { "command" => "seq 1 300" }),
+      execution_start("call-3", "bash", "seq 1 300"),
+      execution_end("call-3", "bash",
+                    { "content" => [{ "type" => "text", "text" => "#{output}\n" }], "details" => {} },
+                    false),
+      { "type" => "agent_end", "messages" => [] }
+    ]
+  when "stub"
+    base_events + text_deltas + [
+      toolcall_start("call-4", "bash"),
+      { "type" => "agent_end", "messages" => [] }
+    ]
+  else
+    raise "Неизвестный FAKE_PI_SCENARIO: #{scenario}"
+  end
+
+events.each { |event| puts JSON.generate(event) }
+
+exit Integer(ENV.fetch("FAKE_PI_EXIT", "0"))
