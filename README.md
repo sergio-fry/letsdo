@@ -1,50 +1,50 @@
 # letsdo
 
-Локальный агент-работник задач Backlog.md/markdown.
+A local agent worker for Backlog.md/markdown tasks.
 
-Ruby-джем: библиотека `lib/letsdo` (ООП-структура: агенты, хранилище
-промптов `agents/`, стример вывода pi, обработка ошибок, цикл оркестратора)
-и исполняемый файл `bin/letsdo`. В будущем джем выделяется в отдельный
-репозиторий — сейчас живёт в папке `letsdo/` корня проекта.
+A Ruby gem: the `lib/letsdo` library (OOP structure: agents, the `agents/`
+prompt store, the pi output streamer, error handling, the orchestrator loop)
+and the executable `bin/letsdo`. In the future the gem moves to its own
+repository — for now it lives in the `letsdo/` folder at the project root.
 
-## Использование
+## Usage
 
-Из папки `letsdo/`:
+From the `letsdo/` folder:
 
 ```sh
-./bin/letsdo <имя>     # прочитать agents/<имя>.md и запустить pi (exit = код pi)
-./bin/letsdo --version # версия джема (из lib/letsdo/version.rb), exit 0
-./bin/letsdo --help    # справка, exit 0
-./bin/letsdo           # usage и список агентов, exit 1
+./bin/letsdo <name>    # read agents/<name>.md and run pi (exit = pi code)
+./bin/letsdo --version # gem version (from lib/letsdo/version.rb), exit 0
+./bin/letsdo --help    # help, exit 0
+./bin/letsdo           # usage and agent list, exit 1
 ```
 
-Корень проекта (где лежит `agents/`) — `LETSDO_ROOT`, по умолчанию текущая
-папка. Дополнительные флаги pi — `LETSDO_PI_FLAGS` (или `AGENT_PI_FLAGS` для
-совместимости с `bin/agent`), команда pi — `LETSDO_PI_COMMAND` (по умолчанию
-`pi`, переопределяется в тестах).
+The project root (where `agents/` lives) is `LETSDO_ROOT`, default is the
+current folder. Extra pi flags — `LETSDO_PI_FLAGS` (or `AGENT_PI_FLAGS` for
+`bin/agent` compatibility), pi command — `LETSDO_PI_COMMAND` (default `pi`,
+overridden in tests).
 
-Подключение как библиотеки:
+As a library:
 
 ```ruby
 require "letsdo"        # module Letsdo, Letsdo::VERSION
 ```
 
-## Структура кода
+## Code structure
 
-ООП-структура джема:
+Gem OOP structure:
 
 ```
 letsdo/
-  bin/letsdo            # входная точка: тонкая обёртка над Letsdo::CLI
-  lib/letsdo.rb         # module Letsdo, require всех компонентов
-  lib/letsdo/errors.rb # Letsdo::Errors: иерархия ошибок
-  lib/letsdo/prompt_store.rb  # Letsdo::PromptStore: промпты agents/*.md
-  lib/letsdo/output_streamer.rb # Letsdo::OutputStreamer: куда печатать вывод
-  lib/letsdo/pi_runner.rb     # Letsdo::PiRunner: запуск pi --mode json
-  lib/letsdo/agent.rb         # Letsdo::Agent: один прогон агента
-  lib/letsdo/loop.rb          # Letsdo::Loop: цикл оркестратора
-  lib/letsdo/cli.rb           # Letsdo::CLI: аргументы, usage, код выхода
-  test/                 # тесты Minitest (test/*_test.rb, fixtures/fake_pi)
+  bin/letsdo            # entry point: thin wrapper over Letsdo::CLI
+  lib/letsdo.rb         # module Letsdo, requires all components
+  lib/letsdo/errors.rb # Letsdo::Errors: error hierarchy
+  lib/letsdo/prompt_store.rb  # Letsdo::PromptStore: agents/*.md prompts
+  lib/letsdo/output_streamer.rb # Letsdo::OutputStreamer: where output is printed
+  lib/letsdo/pi_runner.rb     # Letsdo::PiRunner: running pi --mode json
+  lib/letsdo/agent.rb         # Letsdo::Agent: a single agent run
+  lib/letsdo/loop.rb          # Letsdo::Loop: orchestrator loop
+  lib/letsdo/cli.rb           # Letsdo::CLI: arguments, usage, exit code
+  test/                 # Minitest tests (test/*_test.rb, fixtures/fake_pi)
   letsdo.gemspec        # name=letsdo, executables=["bin/letsdo"]
   Gemfile               # gemspec
   Rakefile              # rake test
@@ -52,65 +52,65 @@ letsdo/
   LICENSE               # MIT
 ```
 
-Ответственность классов:
+Class responsibilities:
 
-- **Letsdo::Errors** — иерархия ошибок пакета: `Letsdo::Error` (базовая),
-  `Letsdo::UnknownAgentError` (агента нет в `agents/`, несёт `.name`).
-- **Letsdo::PromptStore** — доступ к промптам `agents/<имя>.md` в корне
-  проекта: `list` (отсортированные имена), `read(name)` (содержимое или
-  `UnknownAgentError`). Новый агент = новый файл, код менять не нужно.
-- **Letsdo::OutputStreamer** — направляет вывод pi по двум потокам: текст
-  ответа (text_delta) — в stdout, служебные строки инструментов — в stderr.
-  Каждая строка-действие пишется с единым префиксом времени `HH:MM:SS`
-  (запуск `⚙ имя: параметры`, завершение `✓/✖ имя: … (Xs)`), результат —
-  блоком с отступом, большой вывод обрезается с заметкой-сводкой,
-  результаты-ошибки помечаются (`✖ Ошибка: ...`); `finish` гарантирует
-  финальный перевод строки. Длительность действия видна по разнице
-  префиксов времени запуска и завершения.
-- **Letsdo::PiRunner** — запускает `pi --mode json <флаги> <промпт>`, читает
-  построчный поток событий, отдаёт стримеру `text_delta` (текст агента),
-  заголовки и результаты инструментов (`tool_execution_start`/`_end`),
-  игнорирует не-JSON и посторонние события, пробрасывает код выхода pi
-  (включая 128+сигнал). Команда pi переопределяема (`command:`) — для тестов.
-- **Letsdo::Agent** — один прогон агента: читает промпт из `agents/` через
-  `PromptStore` и запускает `PiRunner`. Возвращает код выхода pi; для
-  неизвестного имени бросает `UnknownAgentError`. Это логика одного прогона
-  старого `bin/agent`, перенесённая в джем.
-- **Letsdo::Loop** — цикл оркестратора: пока провайдер отдаёт открытые
-  задачи — запускает агента (один прогон = одна задача); задач нет — ждёт
-  и проверяет снова; `nil` от провайдера = бэклог не читается, агента не
-  запускаем. Остановка — только снаружи через `#stop` (например, обработчиком
-  SIGINT/SIGTERM, как в `bin/agent-loop`). Провайдер и раннер инжектируются —
-  так цикл тестируется без реального бэклога и pi.
-- **Letsdo::CLI** — разбор аргументов и запуск: usage и список агентов
-  при отсутствии аргумента (exit 1), `--version`/`--help` (exit 0),
-  неизвестная опция (exit 1), неизвестный агент — сообщение + список (exit 1);
-  известный агент — прогон через `Letsdo::Agent`, код выхода pi.
+- **Letsdo::Errors** — the package error hierarchy: `Letsdo::Error` (base),
+  `Letsdo::UnknownAgentError` (an agent is not in `agents/`, carries `.name`).
+- **Letsdo::PromptStore** — access to `agents/<name>.md` prompts in the
+  project root: `list` (sorted names), `read(name)` (contents or
+  `UnknownAgentError`). A new agent = a new file, no code changes needed.
+- **Letsdo::OutputStreamer** — routes pi output across two streams: the
+  answer text (text_delta) — to stdout, service tool lines — to stderr.
+  Every action line gets a shared `HH:MM:SS` time prefix (start
+  `⚙ name: arguments`, completion `✓/✖ name: … (Xs)`), the result is an
+  indented block, big output is trimmed with a summary note, error results
+  are marked (`✖ Error: ...`); `finish` guarantees a final newline. The
+  action duration is visible from the difference between the start and
+  completion time prefixes.
+- **Letsdo::PiRunner** — runs `pi --mode json <flags> <prompt>`, reads the
+  line-by-line event stream, hands the streamer `text_delta` (agent text),
+  tool headers and results (`tool_execution_start`/`_end`), ignores non-JSON
+  and unrelated events, propagates the pi exit code (including 128+signal).
+  The pi command is overridable (`command:`) — for tests.
+- **Letsdo::Agent** — a single agent run: reads the prompt from `agents/`
+  via `PromptStore` and runs `PiRunner`. Returns the pi exit code; for an
+  unknown name raises `UnknownAgentError`. This is the logic of a single
+  run of the old `bin/agent`, moved into the gem.
+- **Letsdo::Loop** — the orchestrator loop: while the provider gives open
+  tasks — runs the agent (one run = one task); no tasks — waits and checks
+  again; `nil` from the provider = the backlog is unreadable, the agent is
+  not run. Stopping — only from outside via `#stop` (e.g. by a
+  SIGINT/SIGTERM handler, as in `bin/agent-loop`). The provider and the
+  runner are injected — this way the loop is testable without a real
+  backlog and pi.
+- **Letsdo::CLI** — argument parsing and launching: usage and agent list
+  with no argument (exit 1), `--version`/`--help` (exit 0), unknown option
+  (exit 1), unknown agent — message + list (exit 1); known agent — a run
+  through `Letsdo::Agent`, pi exit code.
 
-## Разработка
+## Development
 
-Тесты на встроенном в Ruby Minitest (простой синтаксис `assert`/`refute`,
-без внешних DSL и мок-фреймворков). Покрыты: чтение промптов `agents/`,
-известный/неизвестный агент, сборка вывода из `text_delta`, заголовки и
-результаты инструментов (включая ошибки и обрезку большого вывода),
-префиксы времени `HH:MM:SS` у строк-действий, проброс
-кода выхода, цикл оркестратора, CLI. Фейковый pi — `test/fixtures/fake_pi` —
-эмулирует поток событий `pi --mode json` для детерминированных тестов
-(сценарии `FAKE_PI_SCENARIO=default|error|big|stub`).
+Tests use Minitest bundled with Ruby (the simple `assert`/`refute` syntax,
+no external DSLs or mock frameworks). Covered: `agents/` prompt reading,
+known/unknown agent, output assembly from `text_delta`, tool headers and
+results (including errors and big-output trimming), `HH:MM:SS` time prefixes
+on action lines, exit-code propagation, the orchestrator loop, CLI. The fake
+pi — `test/fixtures/fake_pi` — emulates the `pi --mode json` event stream for
+deterministic tests (scenarios `FAKE_PI_SCENARIO=default|error|big|stub`).
 
-Запуск тестов без внешних гемов:
+Running tests without external gems:
 
 ```sh
-rake test                 # все тесты
-ruby -Itest -Ilib test/prompt_store_test.rb   # один файл
+rake test                 # all tests
+ruby -Itest -Ilib test/prompt_store_test.rb   # one file
 ```
 
-Сборка джема:
+Building the gem:
 
 ```sh
 gem build letsdo.gemspec
 ```
 
-## Лицензия
+## License
 
-MIT — см. [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).

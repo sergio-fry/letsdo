@@ -3,36 +3,35 @@
 require "shellwords"
 
 module Letsdo
-  # Разбор аргументов командной строки и запуск одного агента.
+  # Command-line argument parsing and running a single agent.
   #
-  # CLI сохраняет контракт каркаса (TASK-20) и добавляет запуск агента:
-  #   letsdo                       — usage и список агентов, код выхода 1;
-  #   letsdo --version             — версия, код выхода 0;
-  #   letsdo --help                — usage, код выхода 0;
-  #   letsdo <имя>                 — прочитать agents/<имя>.md, запустить pi,
-  #                                    код выхода pi;
-  #   letsdo <незнакомое имя>      — «Неизвестный агент: <имя>» + список,
-  #                                    код выхода 1.
-  #   letsdo <неизвестная опция>   — «летсду: неизвестная опция: X» + usage,
-  #                                    код выхода 1.
+  # CLI keeps the scaffold contract (TASK-20) and adds agent launching:
+  #   letsdo                       — usage and agent list, exit code 1;
+  #   letsdo --version             — version, exit code 0;
+  #   letsdo --help                — usage, exit code 0;
+  #   letsdo <name>                — read agents/<name>.md, run pi,
+  #                                    exit code of pi;
+  #   letsdo <unknown name>        — "Unknown agent: <name>" + list,
+  #                                    exit code 1.
+  #   letsdo <unknown option>      — "letsdo: unknown option: X" + usage,
+  #                                    exit code 1.
   #
-  # Окружение:
-  #   LETSDO_ROOT         корень проекта (там лежит agents/); по умолчанию — pwd.
-  #   LETSDO_PI_FLAGS     дополнительные флаги pi (разбиваются по словам; если не
-  #                       задан — берётся AGENT_PI_FLAGS для совместимости с
-  #                       bin/agent).
-  #   LETSDO_PI_COMMAND   команда pi (по умолчанию "pi"); переопределяема для
-  #                       тестов/фейковых pi.
+  # Environment:
+  #   LETSDO_ROOT         project root (agents/ lives there); default — pwd.
+  #   LETSDO_PI_FLAGS     extra pi flags (split on whitespace; if unset —
+  #                       AGENT_PI_FLAGS is used for bin/agent compatibility).
+  #   LETSDO_PI_COMMAND   the pi command (default "pi"); overridable for
+  #                       tests/fake pi.
   class CLI
-    USAGE = "Использование: letsdo <имя_агента>"
-    AGENTS_HEADER = "Доступные агенты:"
+    USAGE = "Usage: letsdo <agent_name>"
+    AGENTS_HEADER = "Available agents:"
 
-    # @param argv [Array<String>] аргументы командной строки
-    # @param env [Hash] окружение процесса (LETSDO_ROOT, LETSDO_PI_FLAGS,
-    #        AGENT_PI_FLAGS); инжектируется в тестах
-    # @param stdout [IO] поток для нормального вывода (usage, --help, список)
-    # @param stderr [IO] поток для служебного вывода
-    # @return [Integer] код выхода: 0 — успех, 1 — ошибка, иначе — код выхода pi
+    # @param argv [Array<String>] command-line arguments
+    # @param env [Hash] process environment (LETSDO_ROOT, LETSDO_PI_FLAGS,
+    #        AGENT_PI_FLAGS); injected in tests
+    # @param stdout [IO] stream for normal output (usage, --help, list)
+    # @param stderr [IO] stream for service output
+    # @return [Integer] exit code: 0 — success, 1 — error, otherwise — pi exit code
     def self.run(argv, env: ENV, stdout: $stdout, stderr: $stderr)
       new(env: env, stdout: stdout, stderr: stderr).run(argv)
     end
@@ -44,8 +43,8 @@ module Letsdo
       @root = env.fetch("LETSDO_ROOT", Dir.pwd)
     end
 
-    # @param argv [Array<String>] аргументы командной строки
-    # @return [Integer] код выхода
+    # @param argv [Array<String>] command-line arguments
+    # @return [Integer] exit code
     def run(argv)
       arg = argv[0]
       case arg
@@ -60,7 +59,7 @@ module Letsdo
         1
       else
         if arg.start_with?("-")
-          @stderr.puts("letsdo: неизвестная опция: #{arg}")
+          @stderr.puts("letsdo: unknown option: #{arg}")
           print_usage(@stderr)
           1
         else
@@ -96,9 +95,9 @@ module Letsdo
       PromptStore.new(root: @root).list.each { |name| @stdout.puts("  #{name}") }
     end
 
-    # LETSDO_PI_FLAGS → массив флагов; пустое значение = без флагов.
-    # Для совместимости с bin/agent при отсутствии LETSDO_PI_FLAGS
-    # используется AGENT_PI_FLAGS.
+    # LETSDO_PI_FLAGS → array of flags; empty value = no flags.
+    # For bin/agent compatibility, when LETSDO_PI_FLAGS is absent
+    # AGENT_PI_FLAGS is used.
     def parse_pi_flags
       value = @env["LETSDO_PI_FLAGS"].to_s
       value = @env["AGENT_PI_FLAGS"].to_s if value.strip.empty?

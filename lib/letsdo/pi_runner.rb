@@ -3,27 +3,28 @@
 require "json"
 
 module Letsdo
-  # Запускает pi в режиме --mode json и по мере генерации отдаёт события
-  # стримеру вывода. Код выхода pi пробрасывается наружу.
+  # Runs pi in --mode json and hands events to the output streamer as they
+  # are generated. The pi exit code is propagated outward.
   #
-  # pi --mode json стримит события построчно: разбираем каждую строку как
-  # JSON и реагируем на:
+  # pi --mode json streams events line by line: each line is parsed as JSON
+  # and reacted to:
   #   message_update (assistantMessageEvent):
-  #     text_delta       - фрагмент текста ответа агента → stdout;
-  #     toolcall_start   - модель начала выдавать вызов инструмента,
-  #                        запоминаем id→имя (фолбэк, см. ниже);
-  #   tool_execution_start - инструмент начал выполняться: есть имя и полные
-  #                        параметры (например, текст команды bash);
-  #   tool_execution_end   - инструмент завершился: result (вывод) и isError;
-  #   agent_end            - конец прогона.
+  #     text_delta       - a fragment of the agent's answer text → stdout;
+  #     toolcall_start   - the model started emitting a tool call,
+  #                        id→name is remembered (fallback, see below);
+  #   tool_execution_start - a tool started executing: name and full
+  #                        arguments are available (e.g. bash command text);
+  #   tool_execution_end   - a tool finished: result (output) and isError;
+  #   agent_end            - the end of the run.
   #
-  # Заголовок «HH:MM:SS ⚙ имя: параметры» печатается при старте выполнения,
-  # результат и строка завершения «✓/✖ имя» — при завершении. Если по какой-то
-  # причине события tool_execution_* не пришли (старые версии pi и т.п.), при
-  # завершении прогона печатаются заглушки «⚙ имя» из запомненных toolcall_start.
+  # The "HH:MM:SS ⚙ name: arguments" header is printed at execution start,
+  # the result and "✓/✖ name" completion line — at completion. If for some
+  # reason no tool_execution_* events arrive (older pi versions, etc.), "⚙ name"
+  # placeholders from remembered toolcall_start events are printed at the end
+  # of the run.
   #
-  # stdout pi (события) читается нами; stderr pi (его собственный лог)
-  # наследуется и уходит в наш stderr.
+  # pi stdout (events) is read by us; pi stderr (its own log) is inherited
+  # and goes to our stderr.
   class PiRunner
     COMMAND = "pi"
     MODE = "json"
@@ -32,10 +33,10 @@ module Letsdo
     TOOL_EXECUTION_END = "tool_execution_end"
     AGENT_END = "agent_end"
 
-    # @param prompt [String] текст промпта агента
-    # @param flags [Array<String>] дополнительные флаги pi
-    # @param streamer [OutputStreamer] куда печатать вывод
-    # @param command [String] команда pi (переопределяема для тестов)
+    # @param prompt [String] agent prompt text
+    # @param flags [Array<String>] extra pi flags
+    # @param streamer [OutputStreamer] where to print output
+    # @param command [String] the pi command (overridable for tests)
     def initialize(prompt:, flags: [], streamer:, command: COMMAND)
       @prompt = prompt
       @flags = flags
@@ -44,9 +45,9 @@ module Letsdo
       @pending_tools = {}
     end
 
-    # Запускает pi и дожидается завершения.
+    # Runs pi and waits for completion.
     #
-    # @return [Integer] код выхода pi (128+сигнал, если pi убит сигналом)
+    # @return [Integer] pi exit code (128+signal if pi was killed by a signal)
     def run
       cmd = [@command, "--mode", MODE, *@flags, @prompt]
       out_r, out_w = IO.pipe
@@ -68,7 +69,7 @@ module Letsdo
 
     private
 
-    # Разбирает одну строку потока событий pi и передаёт её стримеру.
+    # Parses one line of the pi event stream and passes it to the streamer.
     def handle_line(line)
       line = line.strip
       return if line.empty?
@@ -89,7 +90,7 @@ module Letsdo
       end
     end
 
-    # Обработка события обновления сообщения assistant-сообщения.
+    # Handles an assistant message update event.
     def handle_message_update(event)
       payload = event["assistantMessageEvent"]
       return unless payload
@@ -99,28 +100,29 @@ module Letsdo
         delta = payload["delta"]
         @streamer.text_delta(delta) if delta && !delta.empty?
       when "toolcall_start"
-        # Вызов только начал генерироваться: имя известно сразу, параметры
-        # появятся вместе с началом выполнения (tool_execution_start).
+        # The call has just started to be generated: the name is known
+        # immediately, arguments will arrive with the execution start
+        # (tool_execution_start).
         id = event["id"] || payload["id"]
         name = event["toolName"] || payload["toolName"] || "tool"
         @pending_tools[id] = name unless id.nil?
       end
     end
 
-    # Результат выполнения инструмента: текст из result.content + признак
-    # ошибки. Пустой текст ошибки заменяем понятной формулировкой. Строка
-    # завершения печатается всегда (даже при пустом результате), чтобы
-    # завершение действия было видно в служебном выводе.
+    # Tool execution result: text from result.content plus the error flag.
+    # An empty error text is replaced with a clear wording. The completion
+    # line is always printed (even for an empty result), so that the action
+    # completion is visible in the service output.
     def handle_tool_execution_end(event)
       name = event["toolName"] || "tool"
       text = result_text(event["result"])
       error = event["isError"] == true
-      text = "инструмент завершился ошибкой" if (text.nil? || text.empty?) && error
+      text = "tool failed with an error" if (text.nil? || text.empty?) && error
       @streamer.tool_result(name, text, error: error)
     end
 
-    # Собирает текст результата из content-блоков {type: "text"}.
-    # Блоки изображений и прочие типы в текст не попадают.
+    # Collects the result text from {type: "text"} content blocks.
+    # Image blocks and other types do not get into the text.
     def result_text(result)
       return nil unless result.is_a?(Hash)
 
@@ -138,15 +140,16 @@ module Letsdo
       text.empty? ? nil : text
     end
 
-    # Заглушки для вызовов без событий выполнения (old pi и т.п.):
-    # печатаем «⚙ имя» без параметров. Вызывается и на agent_end, и в
-    # ensure после чтения потока; clear защищает от дублей.
+    # Placeholders for calls without execution events (old pi, etc.):
+    # prints "⚙ name" without arguments. Called both on agent_end and in
+    # the ensure block after reading the stream; clear protects against
+    # duplicates.
     def flush_pending_tools
       @pending_tools.each_value { |name| @streamer.tool_start(name) }
       @pending_tools.clear
     end
 
-    # Игнорирует строки, не являющиеся корректными JSON-событиями.
+    # Ignores lines that are not valid JSON events.
     def parse_event(line)
       JSON.parse(line)
     rescue JSON::ParserError

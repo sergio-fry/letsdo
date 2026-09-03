@@ -14,16 +14,16 @@ class OutputStreamerTest < Minitest::Test
   end
 
   def test_text_delta_appends_to_stdout
-    @streamer.text_delta("Привет, ")
-    @streamer.text_delta("мир!")
+    @streamer.text_delta("Hello, ")
+    @streamer.text_delta("world!")
 
-    assert_equal "Привет, мир!", @out.string
+    assert_equal "Hello, world!", @out.string
   end
 
   def test_text_delta_writes_immediately
-    @streamer.text_delta("кусок")
+    @streamer.text_delta("piece")
 
-    assert_equal "кусок", @out.string
+    assert_equal "piece", @out.string
   end
 
   def test_text_delta_ignores_empty_and_nil
@@ -34,9 +34,9 @@ class OutputStreamerTest < Minitest::Test
   end
 
   def test_text_delta_has_no_time_prefix_in_stdout
-    @streamer.text_delta("ответ агента")
+    @streamer.text_delta("agent response")
 
-    assert_equal "ответ агента", @out.string
+    assert_equal "agent response", @out.string
     assert_empty @err.string
   end
 
@@ -88,15 +88,15 @@ class OutputStreamerTest < Minitest::Test
     @streamer.tool_result("bash", "total 8\n")
 
     lines = @err.string.lines
-    # Единый формат префикса у всех строк-действий: запуск и завершение.
+    # A single prefix format for every action line: start and completion.
     assert_equal 4, lines.length
-    assert_match TIME_PREFIX, lines[0] # запуск 1
-    assert_match TIME_PREFIX, lines[1] # запуск 2
-    assert_match TIME_PREFIX, lines[3] # завершение
+    assert_match TIME_PREFIX, lines[0] # start 1
+    assert_match TIME_PREFIX, lines[1] # start 2
+    assert_match TIME_PREFIX, lines[3] # completion
     assert_match /\A14:05:03 ⚙/, lines[0]
     assert_match /\A14:05:10 ⚙/, lines[1]
     assert_match /\A14:05:13 ✓/, lines[3]
-    # Строки результата (данные) префикса времени не получают.
+    # Result lines (data) get no time prefix.
     refute_match TIME_PREFIX, lines[2]
     assert_equal "  total 8\n", lines[2]
   end
@@ -109,7 +109,7 @@ class OutputStreamerTest < Minitest::Test
     assert_equal "14:05:03 ⚙ bash: ls -la\n" \
                  "  total 8\n" \
                  "  file0\n" \
-                 "14:05:10 ✓ bash: завершено (7.0s)\n", @err.string
+                 "14:05:10 ✓ bash: done (7.0s)\n", @err.string
   end
 
   def test_tool_result_elapsed_rounds_seconds_over_ten
@@ -117,76 +117,76 @@ class OutputStreamerTest < Minitest::Test
     @now += 42
     @streamer.tool_result("bash", "ok\n")
 
-    assert_includes @err.string, "14:05:45 ✓ bash: завершено (42s)\n"
+    assert_includes @err.string, "14:05:45 ✓ bash: done (42s)\n"
   end
 
   def test_tool_result_error_is_marked
     @streamer.tool_result("bash", "ls: cannot access '/x': No such file or directory", error: true)
 
-    assert_includes @err.string, "✖ Ошибка: ls: cannot access '/x': No such file or directory"
-    assert_includes @err.string, "14:05:03 ✖ bash: ошибка\n"
+    assert_includes @err.string, "✖ Error: ls: cannot access '/x': No such file or directory"
+    assert_includes @err.string, "14:05:03 ✖ bash: error\n"
   end
 
   def test_tool_result_error_marks_only_first_line
-    @streamer.tool_result("bash", "ошибка\nподробности", error: true)
+    @streamer.tool_result("bash", "error\ndetails", error: true)
 
-    assert_equal "  ✖ Ошибка: ошибка\n" \
-                 "  подробности\n" \
-                 "14:05:03 ✖ bash: ошибка\n", @err.string
+    assert_equal "  ✖ Error: error\n" \
+                 "  details\n" \
+                 "14:05:03 ✖ bash: error\n", @err.string
   end
 
   def test_tool_result_empty_still_prints_completion
     @streamer.tool_result("bash", "")
     @streamer.tool_result("bash", nil)
 
-    assert_equal "14:05:03 ✓ bash: завершено\n" \
-                 "14:05:03 ✓ bash: завершено\n", @err.string
+    assert_equal "14:05:03 ✓ bash: done\n" \
+                 "14:05:03 ✓ bash: done\n", @err.string
   end
 
   def test_tool_result_without_known_start_omits_elapsed
-    @streamer.tool_result("bash", "ок\n")
+    @streamer.tool_result("bash", "ok\n")
 
-    assert_equal "  ок\n" \
-                 "14:05:03 ✓ bash: завершено\n", @err.string
+    assert_equal "  ok\n" \
+                 "14:05:03 ✓ bash: done\n", @err.string
   end
 
   def test_tool_result_truncates_by_lines_with_note
-    text = (1..200).map { |i| "строка #{i}" }.join("\n")
+    text = (1..200).map { |i| "line #{i}" }.join("\n")
     @streamer.tool_result("bash", text)
 
-    assert_includes @err.string, "  строка 1\n"
-    assert_includes @err.string, "… [вывод обрезан: 200 строк,"
-    refute_includes @err.string, "строка 150"
-    assert_includes @err.string, "✓ bash: завершено\n"
+    assert_includes @err.string, "  line 1\n"
+    assert_includes @err.string, "… [output truncated: 200 lines,"
+    refute_includes @err.string, "line 150"
+    assert_includes @err.string, "✓ bash: done\n"
   end
 
   def test_tool_result_truncates_single_long_line
     @streamer.tool_result("bash", "a" * 5_000)
 
-    assert_includes @err.string, "… [вывод обрезан: 1 строка,"
-    # Лимит символов результата: MAX_RESULT_CHARS + префиксы строк.
+    assert_includes @err.string, "… [output truncated: 1 line,"
+    # Result character limit: MAX_RESULT_CHARS + line prefixes.
     assert_operator @err.string.length, :<, Letsdo::OutputStreamer::MAX_RESULT_CHARS + 200
   end
 
   def test_tool_result_without_trailing_empty_line
-    @streamer.tool_result("bash", "первая\n")
+    @streamer.tool_result("bash", "first\n")
 
-    assert_equal "  первая\n" \
-                 "14:05:03 ✓ bash: завершено\n", @err.string
+    assert_equal "  first\n" \
+                 "14:05:03 ✓ bash: done\n", @err.string
   end
 
   def test_finish_adds_trailing_newline_when_missing
-    @streamer.text_delta("ответ без перевода строки")
+    @streamer.text_delta("response without newline")
     @streamer.finish
 
-    assert_equal "ответ без перевода строки\n", @out.string
+    assert_equal "response without newline\n", @out.string
   end
 
   def test_finish_does_not_add_second_newline
-    @streamer.text_delta("ответ\n")
+    @streamer.text_delta("reply\n")
     @streamer.finish
 
-    assert_equal "ответ\n", @out.string
+    assert_equal "reply\n", @out.string
   end
 
   def test_finish_is_noop_when_nothing_was_written

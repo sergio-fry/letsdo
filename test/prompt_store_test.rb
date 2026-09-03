@@ -4,7 +4,7 @@ require_relative "test_helper"
 
 class PromptStoreTest < Minitest::Test
   def test_list_returns_sorted_agent_names
-    with_project("zeta" => "промпт", "alpha" => "промпт") do |root|
+    with_project("zeta" => "prompt", "alpha" => "prompt") do |root|
       store = Letsdo::PromptStore.new(root: root)
 
       assert_equal %w[alpha zeta], store.list
@@ -18,28 +18,28 @@ class PromptStoreTest < Minitest::Test
   end
 
   def test_read_returns_prompt_content
-    with_project("developer" => "Ты разработчик.") do |root|
+    with_project("developer" => "You are a developer.") do |root|
       store = Letsdo::PromptStore.new(root: root)
 
-      assert_equal "Ты разработчик.", store.read("developer")
+      assert_equal "You are a developer.", store.read("developer")
     end
   end
 
   def test_read_known_agent
-    with_project("looptest" => "Ты тестируешь цикл.") do |root|
+    with_project("looptest" => "You test the loop.") do |root|
       store = Letsdo::PromptStore.new(root: root)
 
-      assert store.read("looptest").include?("цикл")
+      assert store.read("looptest").include?("loop")
     end
   end
 
   def test_read_unknown_agent_raises
-    with_project("developer" => "Ты разработчик.") do |root|
+    with_project("developer" => "You are a developer.") do |root|
       store = Letsdo::PromptStore.new(root: root)
 
       error = assert_raises(Letsdo::UnknownAgentError) { store.read("nosuch") }
       assert_equal "nosuch", error.name
-      assert_match(/Неизвестный агент: nosuch/, error.message)
+      assert_match(/Unknown agent: nosuch/, error.message)
     end
   end
 

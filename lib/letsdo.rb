@@ -1,17 +1,17 @@
 # frozen_string_literal: true
 
-# Пакет Letsdo — локальный агент-работник задач Backlog.md/markdown.
+# The Letsdo package — a local agent worker for Backlog.md/markdown tasks.
 #
-# ООП-структура (с прицелом на перенос логики bin/agent):
-#   Letsdo::Errors           - иерархия ошибок (UnknownAgentError и др.)
-#   Letsdo::PromptStore      - доступ к промптам agents/*.md
-#   Letsdo::OutputStreamer   - куда и как печатать текст агента и служебные строки
-#   Letsdo::PiRunner         - запуск pi --mode json и разбор потока событий
-#   Letsdo::Agent            - один прогон агента: промпт из agents/ + pi
-#   Letsdo::Loop             - оркестратор: задачи из бэклога → прогоны → ожидание
-#   Letsdo::CLI              - аргументы командной строки, usage, код выхода
+# OOP structure (aimed at moving bin/agent logic here):
+#   Letsdo::Errors           - error hierarchy (UnknownAgentError and others)
+#   Letsdo::PromptStore      - access to agents/*.md prompts
+#   Letsdo::OutputStreamer   - where and how agent text and service lines are printed
+#   Letsdo::PiRunner         - running pi --mode json and parsing the event stream
+#   Letsdo::Agent            - a single agent run: prompt from agents/ + pi
+#   Letsdo::Loop             - orchestrator: backlog tasks → runs → waiting
+#   Letsdo::CLI              - command-line arguments, usage, exit code
 #
-# Точка входа — bin/letsdo (тонкая обёртка над Letsdo::CLI).
+# Entry point — bin/letsdo (a thin wrapper over Letsdo::CLI).
 
 require_relative "letsdo/version"
 require_relative "letsdo/errors"

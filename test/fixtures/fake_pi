@@ -2,24 +2,24 @@
 # frozen_string_literal: true
 
 #
-# Фейковый pi для тестов Letsdo::PiRunner / Letsdo::Agent / Letsdo::CLI.
+# Fake pi for Letsdo::PiRunner / Letsdo::Agent / Letsdo::CLI tests.
 #
-# Ведёт себя как pi --mode json для детерминированных сценариев:
-#   - принимает те же аргументы: --mode json [флаги] <промпт>;
-#   - пишет в stdout построчный JSON-поток событий, как настоящий pi;
-#   - по умолчанию завершается с кодом 0 (либо FAKE_PI_EXIT).
+# Behaves like pi --mode json for deterministic scenarios:
+#   - accepts the same arguments: --mode json [flags] <prompt>;
+#   - writes a line-by-line JSON event stream to stdout, like real pi;
+#   - by default exits with code 0 (or FAKE_PI_EXIT).
 #
-# Управление (через окружение):
-#   FAKE_PI_EXIT        код выхода (по умолчанию 0)
-#   FAKE_PI_ARGV_FILE   путь: если задан, туда пишется ARGV.join("|") —
-#                       для проверки порядка аргументов (флаги, промпт)
-#   FAKE_PI_SCENARIO    содержимое потока событий:
-#                       default — текст + успешный вызов bash;
-#                       error   — текст + вызов bash с ошибкой (isError);
-#                       big     — текст + вызов bash с большим выводом
-#                                  (проверка обрезки результата);
-#                       stub    — только toolcall_start без событий
-#                                  выполнения (проверка фолбэка «⚙ имя»).
+# Control (via the environment):
+#   FAKE_PI_EXIT        exit code (default 0)
+#   FAKE_PI_ARGV_FILE   path: if set, ARGV.join("|") is written there —
+#                       to check the argument order (flags, prompt)
+#   FAKE_PI_SCENARIO    event stream contents:
+#                       default — text + a successful bash call;
+#                       error   — text + a bash call with an error (isError);
+#                       big     — text + a bash call with a big output
+#                                  (result truncation check);
+#                       stub    — only toolcall_start without execution
+#                                  events ("⚙ name" fallback check).
 #
 
 require "json"
@@ -59,14 +59,14 @@ def execution_end(id, name, result, is_error)
 end
 
 text_deltas = [
-  { "type" => "message_update", "assistantMessageEvent" => { "type" => "text_delta", "delta" => "Привет, " } },
+  { "type" => "message_update", "assistantMessageEvent" => { "type" => "text_delta", "delta" => "Hello, " } },
   { "type" => "message_update" },
   { "type" => "message_update", "assistantMessageEvent" => { "type" => "text_delta", "delta" => "" } },
-  { "type" => "message_update", "assistantMessageEvent" => { "type" => "text_delta", "delta" => "мир!" } }
+  { "type" => "message_update", "assistantMessageEvent" => { "type" => "text_delta", "delta" => "world!" } }
 ]
 
 base_events = [
-  "это не JSON",
+  "this is not JSON",
   { "type" => "other_event", "data" => 1 }
 ]
 
@@ -113,7 +113,7 @@ events =
       { "type" => "agent_end", "messages" => [] }
     ]
   else
-    raise "Неизвестный FAKE_PI_SCENARIO: #{scenario}"
+    raise "Unknown FAKE_PI_SCENARIO: #{scenario}"
   end
 
 events.each { |event| puts JSON.generate(event) }

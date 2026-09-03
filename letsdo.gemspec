@@ -8,20 +8,20 @@ Gem::Specification.new do |spec|
   spec.authors = ["Sergei O. Udalov"]
   spec.email   = ["udalov.x@mail.ru"]
 
-  spec.summary     = "Локальный агент-работник задач Backlog.md/markdown"
-  spec.description = "letsdo — локальный агент-работник задач Backlog.md/markdown. " \
-                     "ООП-структура: Letsdo::PromptStore (agents/), Letsdo::OutputStreamer " \
-                     "и Letsdo::PiRunner (pi --mode json), Letsdo::Agent (один прогон), " \
-                     "Letsdo::Loop (цикл оркестратора), Letsdo::CLI. Тесты на Minitest. " \
-                     "В будущем выделяется в отдельный репозиторий."
+  spec.summary     = "A local agent worker for Backlog.md/markdown tasks"
+  spec.description = "letsdo — a local agent worker for Backlog.md/markdown tasks. " \
+                     "OOP structure: Letsdo::PromptStore (agents/), Letsdo::OutputStreamer " \
+                     "and Letsdo::PiRunner (pi --mode json), Letsdo::Agent (one run), " \
+                     "Letsdo::Loop (orchestrator loop), Letsdo::CLI. Minitest tests. " \
+                     "Will later be split into a separate repository."
   spec.license = "MIT"
 
   spec.required_ruby_version = ">= 3.0"
 
-  # RubyGems разрешает executables относительно bindir: литеральное значение
-  # "bin/letsdo" заставило бы gem build искать bin/bin/letsdo. Каноническая
-  # форма: bindir="bin" + executables=["letsdo"] — исполняемый файл джема
-  # это bin/letsdo, в PATH он попадает как команда letsdo.
+  # RubyGems resolves executables relative to bindir: the literal value
+  # "bin/letsdo" would make gem build look for bin/bin/letsdo. The canonical
+  # form: bindir="bin" + executables=["letsdo"] — the gem executable file
+  # is bin/letsdo, into PATH it goes as the letsdo command.
   spec.files         = Dir["lib/**/*.rb", "README.md", "LICENSE"]
   spec.bindir        = "bin"
   spec.executables   = ["letsdo"]

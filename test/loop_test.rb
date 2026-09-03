@@ -4,8 +4,8 @@ require_relative "test_helper"
 require "stringio"
 
 class LoopTest < Minitest::Test
-  # Провайдер задач, отдающий задачи по расписанию:
-  #   schedule = [[...], [...]] — какие задачи вернуть на каждый вызов.
+  # A task provider returning tasks on a schedule:
+  #   schedule = [[...], [...]] — which tasks to return on each call.
   def scheduled_provider(schedule)
     index = 0
     lambda do
@@ -15,7 +15,7 @@ class LoopTest < Minitest::Test
     end
   end
 
-  # Создаёт цикл, останавливающийся сразу после первого ожидания.
+  # Creates a loop that stops right after the first wait.
   def loop_that_stops_after_first_wait(provider:, runs:, wait_seconds: 0.01)
     loop_obj = nil
     sleeper = lambda do |seconds|
@@ -62,7 +62,7 @@ class LoopTest < Minitest::Test
   end
 
   def test_nil_tasks_means_retry_without_running
-    # nil = бэклог не читается: агента не запускаем, ждём и пробуем снова.
+    # nil = the backlog is unreadable: we do not run the agent, wait and retry.
     runs = { tasks: [], waits: [] }
     provider_calls = 0
     provider = lambda do

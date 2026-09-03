@@ -11,13 +11,13 @@ class PiRunnerTest < Minitest::Test
     @streamer = Letsdo::OutputStreamer.new(stdout: @out, stderr: @err)
   end
 
-  # Запускает фейковый pi с данным промптом и флагами.
+  # Runs the fake pi with the given prompt and flags.
   def run_pi(prompt:, flags: [], scenario: nil)
     runner = Letsdo::PiRunner.new(prompt: prompt, flags: flags, streamer: @streamer, command: fake_pi)
     with_scenario(scenario) { runner.run }
   end
 
-  # Выставляет FAKE_PI_SCENARIO на время прогона и убирает после.
+  # Sets FAKE_PI_SCENARIO for the duration of the run and removes it after.
   def with_scenario(scenario)
     old = ENV["FAKE_PI_SCENARIO"]
     ENV["FAKE_PI_SCENARIO"] = scenario if scenario
@@ -31,90 +31,90 @@ class PiRunnerTest < Minitest::Test
       old = ENV["FAKE_PI_ARGV_FILE"]
       ENV["FAKE_PI_ARGV_FILE"] = file.path
       begin
-        run_pi(prompt: "Ты агент", flags: ["--model", "m"])
+        run_pi(prompt: "You are an agent", flags: ["--model", "m"])
       ensure
         ENV["FAKE_PI_ARGV_FILE"] = old
       end
 
       argv = File.read(file.path)
-      # Прочитали ровно тот ARGV, что получил фейковый pi.
-      assert_includes argv, "--mode|json|--model|m|Ты агент"
+      # Read exactly the ARGV the fake pi received.
+      assert_includes argv, "--mode|json|--model|m|You are an agent"
     end
   end
 
   def test_exit_code_zero
-    assert_equal 0, run_pi(prompt: "Ты агент")
+    assert_equal 0, run_pi(prompt: "You are an agent")
   end
 
   def test_exit_code_propagated
     old = ENV["FAKE_PI_EXIT"]
     ENV["FAKE_PI_EXIT"] = "7"
     begin
-      assert_equal 7, run_pi(prompt: "Ты агент")
+      assert_equal 7, run_pi(prompt: "You are an agent")
     ensure
       ENV["FAKE_PI_EXIT"] = old
     end
   end
 
   def test_output_assembled_from_text_delta
-    run_pi(prompt: "Ты агент")
+    run_pi(prompt: "You are an agent")
 
-    # Не-JSON строка и событие other_event в потоке фейкового pi
-    # игнорируются; в stdout попадают только text_delta.
-    assert_equal "Привет, мир!\n", @out.string
+    # A non-JSON line and the other_event in the fake pi stream are ignored;
+    # only text_delta reaches stdout.
+    assert_equal "Hello, world!\n", @out.string
   end
 
   def test_empty_text_delta_ignored
-    run_pi(prompt: "Ты агент")
+    run_pi(prompt: "You are an agent")
 
-    assert_equal "Привет, мир!\n", @out.string
+    assert_equal "Hello, world!\n", @out.string
   end
 
   def test_tool_header_shows_name_and_command
-    run_pi(prompt: "Ты агент")
+    run_pi(prompt: "You are an agent")
 
-    # Заголовок вызова: префикс времени, имя инструмента и текст команды bash.
+    # Call header: time prefix, tool name and the bash command text.
     assert_match(/\A\d{2}:\d{2}:\d{2} ⚙ bash: ls -la\n/, @err.string)
     assert_includes @err.string, "⚙ bash: ls -la"
-    assert_equal "Привет, мир!\n", @out.string
+    assert_equal "Hello, world!\n", @out.string
   end
 
   def test_tool_completion_has_time_prefix_and_elapsed
-    run_pi(prompt: "Ты агент")
+    run_pi(prompt: "You are an agent")
 
-    # Завершение: префикс времени, вердикт, имя и длительность.
-    assert_match(/\n\d{2}:\d{2}:\d{2} ✓ bash: завершено \(\d+(\.\d+)?s\)\n\z/, @err.string)
+    # Completion: time prefix, verdict, name and duration.
+    assert_match(/\n\d{2}:\d{2}:\d{2} ✓ bash: done \(\d+(\.\d+)?s\)\n\z/, @err.string)
   end
 
   def test_tool_result_goes_to_stderr
-    run_pi(prompt: "Ты агент")
+    run_pi(prompt: "You are an agent")
 
-    # Вывод команды — в stderr, с отступом, без пометки ошибки.
+    # Command output — to stderr, indented, without an error mark.
     assert_includes @err.string, "  total 8"
     assert_includes @err.string, "  drwxr-xr-x  root root"
-    refute_includes @err.string, "✖ Ошибка:"
+    refute_includes @err.string, "✖ Error:"
   end
 
   def test_tool_error_is_marked
-    run_pi(prompt: "Ты агент", scenario: "error")
+    run_pi(prompt: "You are an agent", scenario: "error")
 
     assert_includes @err.string, "⚙ bash: ls /nonexistent"
-    assert_includes @err.string, "✖ Ошибка:"
+    assert_includes @err.string, "✖ Error:"
     assert_includes @err.string, "Command exited with code 2"
   end
 
   def test_big_tool_result_is_truncated_with_note
-    run_pi(prompt: "Ты агент", scenario: "big")
+    run_pi(prompt: "You are an agent", scenario: "big")
 
-    assert_includes @err.string, "… [вывод обрезан:"
-    # Первые строки вывода на месте.
+    assert_includes @err.string, "… [output truncated:"
+    # The first output lines are in place.
     assert_includes @err.string, "  line 001: xyz"
   end
 
   def test_toolcall_start_without_execution_falls_back_to_name_only
-    run_pi(prompt: "Ты агент", scenario: "stub")
+    run_pi(prompt: "You are an agent", scenario: "stub")
 
-    # Нет tool_execution_* — при завершении печатается заглушка «⚙ имя».
+    # No tool_execution_* — a "⚙ name" placeholder is printed on completion.
     assert_includes @err.string, "⚙ bash"
     refute_includes @err.string, "⚙ bash:"
   end

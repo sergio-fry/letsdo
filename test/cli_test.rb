@@ -10,7 +10,7 @@ class CliTest < Minitest::Test
     @err = StringIO.new
   end
 
-  # Запускает Letsdo::CLI с тестовым окружением (root = временный проект).
+  # Runs Letsdo::CLI with a test environment (root = a temporary project).
   def run_cli(argv, prompts:, env: {})
     with_project(prompts) do |root|
       Letsdo::CLI.run(argv, env: env.merge("LETSDO_ROOT" => root), stdout: @out, stderr: @err)
@@ -21,8 +21,8 @@ class CliTest < Minitest::Test
     code = run_cli([], prompts: { "developer" => "x", "looptest" => "y" })
 
     assert_equal 1, code
-    assert_includes @err.string, "Использование: letsdo <имя_агента>"
-    assert_includes @out.string, "Доступные агенты:"
+    assert_includes @err.string, "Usage: letsdo <agent_name>"
+    assert_includes @out.string, "Available agents:"
     assert_includes @out.string, "developer"
     assert_includes @out.string, "looptest"
   end
@@ -42,22 +42,22 @@ class CliTest < Minitest::Test
     code = run_cli(["--help"], prompts: {})
 
     assert_equal 0, code
-    assert_includes @out.string, "Использование: letsdo <имя_агента>"
+    assert_includes @out.string, "Usage: letsdo <agent_name>"
   end
 
   def test_unknown_option_exit_1
     code = run_cli(["--badopt"], prompts: {})
 
     assert_equal 1, code
-    assert_includes @err.string, "letsdo: неизвестная опция: --badopt"
+    assert_includes @err.string, "letsdo: unknown option: --badopt"
   end
 
   def test_unknown_agent_prints_error_and_agents_exit_1
     code = run_cli(["nosuch"], prompts: { "developer" => "x", "looptest" => "y" })
 
     assert_equal 1, code
-    assert_includes @err.string, "Неизвестный агент: nosuch"
-    assert_includes @out.string, "Доступные агенты:"
+    assert_includes @err.string, "Unknown agent: nosuch"
+    assert_includes @out.string, "Available agents:"
     assert_includes @out.string, "developer"
     assert_includes @out.string, "looptest"
   end
@@ -66,7 +66,7 @@ class CliTest < Minitest::Test
     old = ENV["FAKE_PI_EXIT"]
     ENV["FAKE_PI_EXIT"] = "7"
     begin
-      code = run_cli(["developer"], prompts: { "developer" => "Ты разработчик." },
+      code = run_cli(["developer"], prompts: { "developer" => "You are a developer." },
                      env: { "LETSDO_PI_COMMAND" => fake_pi })
     ensure
       ENV["FAKE_PI_EXIT"] = old
@@ -76,11 +76,11 @@ class CliTest < Minitest::Test
   end
 
   def test_known_agent_assembles_output_via_pi
-    code = run_cli(["developer"], prompts: { "developer" => "Ты разработчик." },
+    code = run_cli(["developer"], prompts: { "developer" => "You are a developer." },
                    env: { "LETSDO_PI_COMMAND" => fake_pi })
 
     assert_equal 0, code
-    assert_equal "Привет, мир!\n", @out.string
+    assert_equal "Hello, world!\n", @out.string
   end
 
   def test_flags_from_letsdo_pi_flags_env
@@ -88,7 +88,7 @@ class CliTest < Minitest::Test
       old = ENV["FAKE_PI_ARGV_FILE"]
       ENV["FAKE_PI_ARGV_FILE"] = file.path
       begin
-        run_cli(["developer"], prompts: { "developer" => "Ты разработчик." },
+        run_cli(["developer"], prompts: { "developer" => "You are a developer." },
                  env: { "LETSDO_PI_COMMAND" => fake_pi, "LETSDO_PI_FLAGS" => "--model m" })
       ensure
         ENV["FAKE_PI_ARGV_FILE"] = old
@@ -103,7 +103,7 @@ class CliTest < Minitest::Test
       old = ENV["FAKE_PI_ARGV_FILE"]
       ENV["FAKE_PI_ARGV_FILE"] = file.path
       begin
-        run_cli(["developer"], prompts: { "developer" => "Ты разработчик." },
+        run_cli(["developer"], prompts: { "developer" => "You are a developer." },
                  env: { "LETSDO_PI_COMMAND" => fake_pi, "AGENT_PI_FLAGS" => "--model m" })
       ensure
         ENV["FAKE_PI_ARGV_FILE"] = old

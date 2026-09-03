@@ -1,18 +1,19 @@
 # frozen_string_literal: true
 
 module Letsdo
-  # Один прогон агента: по имени читает промпт из agents/<имя>.md и
-  # запускает pi с этим промптом. Возвращает код выхода pi.
+  # A single agent run: reads the prompt from agents/<name>.md by agent name
+  # and runs pi with that prompt. Returns the pi exit code.
   #
-  # Это логика одного прогона bin/agent: хранилище промптов + стример вывода
-  # + раннер pi. Оркестратор (цикл, пока есть задачи) — в Letsdo::Loop.
+  # This is the logic of one bin/agent run: a prompt store + an output
+  # streamer + a pi runner. The orchestrator (a loop while tasks exist)
+  # lives in Letsdo::Loop.
   class Agent
-    # @param name [String] имя агента (agents/<name>.md)
-    # @param root [String] корень проекта (там лежит agents/)
-    # @param flags [Array<String>] дополнительные флаги pi
-    # @param streamer [OutputStreamer] куда печатать вывод (по умолчанию
-    #        настоящие stdout/stderr)
-    # @param command [String] команда pi (переопределяема для тестов)
+    # @param name [String] agent name (agents/<name>.md)
+    # @param root [String] project root (agents/ lives there)
+    # @param flags [Array<String>] extra pi flags
+    # @param streamer [OutputStreamer] where to print output (by default
+    #        the real stdout/stderr)
+    # @param command [String] the pi command (overridable for tests)
     def initialize(name:, root:, flags: [], streamer: nil, command: PiRunner::COMMAND)
       @name = name
       @root = root
@@ -21,10 +22,10 @@ module Letsdo
       @command = command
     end
 
-    # Запускает агента один раз.
+    # Runs the agent once.
     #
-    # @return [Integer] код выхода pi
-    # @raise [UnknownAgentError] если агента нет в agents/
+    # @return [Integer] pi exit code
+    # @raise [UnknownAgentError] if the agent is not in agents/
     def run
       prompt = prompt_store.read(@name)
       PiRunner.new(prompt: prompt, flags: @flags, streamer: @streamer, command: @command).run

@@ -2,24 +2,24 @@
 # frozen_string_literal: true
 
 #
-# letsdo — локальный агент-работник задач Backlog.md/markdown.
+# letsdo — a local agent worker for Backlog.md/markdown tasks.
 #
-# Тонкая обёртка над Letsdo::CLI: запускает агента по имени (промпт из
-# agents/<имя>.md в корне проекта) через pi, либо выводит version/usage.
+# A thin wrapper over Letsdo::CLI: runs an agent by name (prompt from
+# agents/<name>.md in the project root) through pi, or prints version/usage.
 #
-# Использование:
-#   ./bin/letsdo <имя>     # запуск агента <имя> (код выхода pi)
-#   ./bin/letsdo --version # версия, exit 0
-#   ./bin/letsdo --help    # справка, exit 0
-#   ./bin/letsdo           # usage и список агентов, exit 1
-#   ./bin/letsdo --badopt  # «неизвестная опция» + usage, exit 1
+# Usage:
+#   ./bin/letsdo <name>    # run the <name> agent (pi exit code)
+#   ./bin/letsdo --version # version, exit 0
+#   ./bin/letsdo --help    # help, exit 0
+#   ./bin/letsdo           # usage and agent list, exit 1
+#   ./bin/letsdo --badopt  # "unknown option" + usage, exit 1
 #
-# Окружение:
-#   LETSDO_ROOT       корень проекта с agents/ (по умолчанию — текущая папка)
-#   LETSDO_PI_FLAGS   дополнительные флаги pi (например: "--model anthropic/claude-sonnet-4-5")
-#   AGENT_PI_FLAGS    то же, для совместимости с bin/agent, если LETSDO_PI_FLAGS не задан
+# Environment:
+#   LETSDO_ROOT       project root with agents/ (default — current folder)
+#   LETSDO_PI_FLAGS   extra pi flags (e.g. "--model anthropic/claude-sonnet-4-5")
+#   AGENT_PI_FLAGS    the same, for bin/agent compatibility if LETSDO_PI_FLAGS is unset
 #
-# Новый агент = новый файл agents/<имя>.md, менять код не нужно.
+# A new agent = a new agents/<name>.md file, no code changes needed.
 #
 
 require_relative "../lib/letsdo"

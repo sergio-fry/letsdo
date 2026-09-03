@@ -1,21 +1,21 @@
 # frozen_string_literal: true
 
 module Letsdo
-  # Оркестратор: пока в бэклоге есть открытые задачи, назначенные агенту,
-  # запускает агента (один прогон = одна задача). Когда задач нет — ждёт и
-  # проверяет снова. Остановка — только снаружи: #stop (обычно обработчиком
-  # SIGINT/SIGTERM, как в bin/agent-loop).
+  # Orchestrator: while the backlog has open tasks assigned to the agent,
+  # runs the agent (one run = one task). When there are no tasks — waits
+  # and checks again. Stopping — only from outside: #stop (usually by a
+  # SIGINT/SIGTERM handler, as in bin/agent-loop).
   #
-  # Провайдер задач и раннер инжектируются, чтобы цикл был тестируем без
-  # реального бэклога и pi; по умолчанию они собираются из окружения проекта
-  # (backlog CLI + Letsdo::Agent).
+  # The task provider and the runner are injected so the loop is testable
+  # without a real backlog and pi; by default they are assembled from the
+  # project environment (backlog CLI + Letsdo::Agent).
   class Loop
-    # @param task_provider [Proc] callable → Array открытых задач
-    #        (пусто = задач нет; nil = состояние бэклога не читается,
-    #        в этом случае цикл не запускает агента и повторяет проверку)
-    # @param run_task [Proc] callable(задача) → код выхода прогона агента
-    # @param wait_seconds [Float] интервал ожидания при отсутствии задач
-    # @param sleeper [Proc] callable(Float) → ожидание (инжектируется в тестах)
+    # @param task_provider [Proc] callable → Array of open tasks
+    #        (empty = no tasks; nil = the backlog state is unreadable,
+    #        in this case the loop does not run the agent and retries)
+    # @param run_task [Proc] callable(task) → agent run exit code
+    # @param wait_seconds [Float] wait interval when there are no tasks
+    # @param sleeper [Proc] callable(Float) → waiting (injected in tests)
     def initialize(task_provider:, run_task:, wait_seconds: 10.0, sleeper: nil)
       @task_provider = task_provider
       @run_task = run_task
@@ -24,7 +24,7 @@ module Letsdo
       @stopped = false
     end
 
-    # Запрашивает остановку после текущего шага.
+    # Requests a stop after the current step.
     def stop
       @stopped = true
     end
@@ -33,9 +33,9 @@ module Letsdo
       @stopped
     end
 
-    # Запускает цикл; завершается только по #stop.
+    # Runs the loop; ends only via #stop.
     #
-    # @return [Integer] количество выполненных прогонов агента
+    # @return [Integer] number of completed agent runs
     def run
       runs = 0
       until @stopped

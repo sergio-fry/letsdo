@@ -5,21 +5,21 @@ require "tmpdir"
 require "fileutils"
 require_relative "../lib/letsdo"
 
-# Общая обвязка тестов джема letsdo:
+# Shared harness for the letsdo gem tests:
 #
-# - требуется minitest/autorun (встроенный в Ruby, никаких внешних гемов);
-#   тесты используют только простой синтаксис assert/refute — без DSL и
-#   мок-фреймворков.
-# - фикстуры создаются во временных каталогах (Dir.mktmpdir) и убираются
-#   автоматически после каждого теста.
-# - для тестов, которые запускают pi, используется фейковый исполняемый
-#   скрипт test/fixtures/fake_pi (см. его шапку).
+# - requires minitest/autorun (bundled with Ruby, no external gems);
+#   tests use only the simple assert/refute syntax — no DSL or
+#   mock frameworks.
+# - fixtures are created in temporary directories (Dir.mktmpdir) and
+#   removed automatically after each test.
+# - tests that run pi use the fake executable script
+#   test/fixtures/fake_pi (see its header).
 
 module LetsdoTestHelpers
-  # Корень временного проекта: agents/ с промптами (имя => содержимое).
+  # Root of a temporary project: agents/ with prompts (name => contents).
   #
-  # @param prompts [Hash{String=>String}] имя агента → текст промпта
-  # @return [String] путь к корню временного проекта
+  # @param prompts [Hash{String=>String}] agent name → prompt text
+  # @return [String] path to the temporary project root
   def with_project(prompts)
     Dir.mktmpdir("letsdo-project") do |dir|
       agents_dir = File.join(dir, "agents")
@@ -31,12 +31,12 @@ module LetsdoTestHelpers
     end
   end
 
-  # Корень временного проекта без каталога agents/
+  # Root of a temporary project without an agents/ directory
   def with_empty_project
     Dir.mktmpdir("letsdo-project") { |dir| yield dir }
   end
 
-  # Путь к фейковому pi.
+  # Path to the fake pi.
   def fake_pi
     File.expand_path("fixtures/fake_pi", __dir__)
   end
