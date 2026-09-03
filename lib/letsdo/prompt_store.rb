@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
 module Letsdo
-  # Доступ к промптам агентов: каталог .agents/<имя>.md в корне проекта.
-  # Новый агент = новый файл .agents/<имя>.md, менять код не нужно.
+  # Доступ к промптам агентов: каталог agents/<имя>.md в корне проекта.
+  # Новый агент = новый файл agents/<имя>.md, менять код не нужно.
   class PromptStore
-    AGENTS_DIR = ".agents"
+    AGENTS_DIR = "agents"
 
-    # @param root [String] корень проекта (там лежит .agents/)
+    # @param root [String] корень проекта (там лежит agents/)
     def initialize(root:)
       @root = root
     end
@@ -21,7 +21,7 @@ module Letsdo
     # Читает промпт агента.
     #
     # @param name [String] имя агента
-    # @return [String] содержимое .agents/<name>.md
+    # @return [String] содержимое agents/<name>.md
     # @raise [UnknownAgentError] если такого агента нет
     def read(name)
       path = File.join(agents_dir, "#{name}.md")

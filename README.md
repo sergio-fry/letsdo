@@ -3,7 +3,7 @@
 Локальный агент-работник задач Backlog.md/markdown.
 
 Ruby-джем: библиотека `lib/letsdo` (ООП-структура: агенты, хранилище
-промптов `.agents/`, стример вывода pi, обработка ошибок, цикл оркестратора)
+промптов `agents/`, стример вывода pi, обработка ошибок, цикл оркестратора)
 и исполняемый файл `bin/letsdo`. В будущем джем выделяется в отдельный
 репозиторий — сейчас живёт в папке `letsdo/` корня проекта.
 
@@ -12,13 +12,13 @@ Ruby-джем: библиотека `lib/letsdo` (ООП-структура: а�
 Из папки `letsdo/`:
 
 ```sh
-./bin/letsdo <имя>     # прочитать .agents/<имя>.md и запустить pi (exit = код pi)
+./bin/letsdo <имя>     # прочитать agents/<имя>.md и запустить pi (exit = код pi)
 ./bin/letsdo --version # версия джема (из lib/letsdo/version.rb), exit 0
 ./bin/letsdo --help    # справка, exit 0
 ./bin/letsdo           # usage и список агентов, exit 1
 ```
 
-Корень проекта (где лежит `.agents/`) — `LETSDO_ROOT`, по умолчанию текущая
+Корень проекта (где лежит `agents/`) — `LETSDO_ROOT`, по умолчанию текущая
 папка. Дополнительные флаги pi — `LETSDO_PI_FLAGS` (или `AGENT_PI_FLAGS` для
 совместимости с `bin/agent`), команда pi — `LETSDO_PI_COMMAND` (по умолчанию
 `pi`, переопределяется в тестах).
@@ -38,7 +38,7 @@ letsdo/
   bin/letsdo            # входная точка: тонкая обёртка над Letsdo::CLI
   lib/letsdo.rb         # module Letsdo, require всех компонентов
   lib/letsdo/errors.rb # Letsdo::Errors: иерархия ошибок
-  lib/letsdo/prompt_store.rb  # Letsdo::PromptStore: промпты .agents/*.md
+  lib/letsdo/prompt_store.rb  # Letsdo::PromptStore: промпты agents/*.md
   lib/letsdo/output_streamer.rb # Letsdo::OutputStreamer: куда печатать вывод
   lib/letsdo/pi_runner.rb     # Letsdo::PiRunner: запуск pi --mode json
   lib/letsdo/agent.rb         # Letsdo::Agent: один прогон агента
@@ -55,8 +55,8 @@ letsdo/
 Ответственность классов:
 
 - **Letsdo::Errors** — иерархия ошибок пакета: `Letsdo::Error` (базовая),
-  `Letsdo::UnknownAgentError` (агента нет в `.agents/`, несёт `.name`).
-- **Letsdo::PromptStore** — доступ к промптам `.agents/<имя>.md` в корне
+  `Letsdo::UnknownAgentError` (агента нет в `agents/`, несёт `.name`).
+- **Letsdo::PromptStore** — доступ к промптам `agents/<имя>.md` в корне
   проекта: `list` (отсортированные имена), `read(name)` (содержимое или
   `UnknownAgentError`). Новый агент = новый файл, код менять не нужно.
 - **Letsdo::OutputStreamer** — направляет вывод pi по двум потокам: текст
@@ -69,7 +69,7 @@ letsdo/
   заголовки и результаты инструментов (`tool_execution_start`/`_end`),
   игнорирует не-JSON и посторонние события, пробрасывает код выхода pi
   (включая 128+сигнал). Команда pi переопределяема (`command:`) — для тестов.
-- **Letsdo::Agent** — один прогон агента: читает промпт из `.agents/` через
+- **Letsdo::Agent** — один прогон агента: читает промпт из `agents/` через
   `PromptStore` и запускает `PiRunner`. Возвращает код выхода pi; для
   неизвестного имени бросает `UnknownAgentError`. Это логика одного прогона
   старого `bin/agent`, перенесённая в джем.
@@ -87,7 +87,7 @@ letsdo/
 ## Разработка
 
 Тесты на встроенном в Ruby Minitest (простой синтаксис `assert`/`refute`,
-без внешних DSL и мок-фреймворков). Покрыты: чтение промптов `.agents/`,
+без внешних DSL и мок-фреймворков). Покрыты: чтение промптов `agents/`,
 известный/неизвестный агент, сборка вывода из `text_delta`, заголовки и
 результаты инструментов (включая ошибки и обрезку большого вывода), проброс
 кода выхода, цикл оркестратора, CLI. Фейковый pi — `test/fixtures/fake_pi` —

@@ -4,10 +4,10 @@
 #
 # ООП-структура (с прицелом на перенос логики bin/agent):
 #   Letsdo::Errors           - иерархия ошибок (UnknownAgentError и др.)
-#   Letsdo::PromptStore      - доступ к промптам .agents/*.md
+#   Letsdo::PromptStore      - доступ к промптам agents/*.md
 #   Letsdo::OutputStreamer   - куда и как печатать текст агента и служебные строки
 #   Letsdo::PiRunner         - запуск pi --mode json и разбор потока событий
-#   Letsdo::Agent            - один прогон агента: промпт из .agents/ + pi
+#   Letsdo::Agent            - один прогон агента: промпт из agents/ + pi
 #   Letsdo::Loop             - оркестратор: задачи из бэклога → прогоны → ожидание
 #   Letsdo::CLI              - аргументы командной строки, usage, код выхода
 #

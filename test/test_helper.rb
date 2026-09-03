@@ -16,13 +16,13 @@ require_relative "../lib/letsdo"
 #   скрипт test/fixtures/fake_pi (см. его шапку).
 
 module LetsdoTestHelpers
-  # Корень временного проекта: .agents/ с промптами (имя => содержимое).
+  # Корень временного проекта: agents/ с промптами (имя => содержимое).
   #
   # @param prompts [Hash{String=>String}] имя агента → текст промпта
   # @return [String] путь к корню временного проекта
   def with_project(prompts)
     Dir.mktmpdir("letsdo-project") do |dir|
-      agents_dir = File.join(dir, ".agents")
+      agents_dir = File.join(dir, "agents")
       FileUtils.mkdir_p(agents_dir)
       prompts.each do |name, body|
         File.write(File.join(agents_dir, "#{name}.md"), body)
@@ -31,7 +31,7 @@ module LetsdoTestHelpers
     end
   end
 
-  # Корень временного проекта без каталога .agents/
+  # Корень временного проекта без каталога agents/
   def with_empty_project
     Dir.mktmpdir("letsdo-project") { |dir| yield dir }
   end

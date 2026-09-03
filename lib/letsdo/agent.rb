@@ -1,14 +1,14 @@
 # frozen_string_literal: true
 
 module Letsdo
-  # Один прогон агента: по имени читает промпт из .agents/<имя>.md и
+  # Один прогон агента: по имени читает промпт из agents/<имя>.md и
   # запускает pi с этим промптом. Возвращает код выхода pi.
   #
   # Это логика одного прогона bin/agent: хранилище промптов + стример вывода
   # + раннер pi. Оркестратор (цикл, пока есть задачи) — в Letsdo::Loop.
   class Agent
-    # @param name [String] имя агента (.agents/<name>.md)
-    # @param root [String] корень проекта (там лежит .agents/)
+    # @param name [String] имя агента (agents/<name>.md)
+    # @param root [String] корень проекта (там лежит agents/)
     # @param flags [Array<String>] дополнительные флаги pi
     # @param streamer [OutputStreamer] куда печатать вывод (по умолчанию
     #        настоящие stdout/stderr)
@@ -24,7 +24,7 @@ module Letsdo
     # Запускает агента один раз.
     #
     # @return [Integer] код выхода pi
-    # @raise [UnknownAgentError] если агента нет в .agents/
+    # @raise [UnknownAgentError] если агента нет в agents/
     def run
       prompt = prompt_store.read(@name)
       PiRunner.new(prompt: prompt, flags: @flags, streamer: @streamer, command: @command).run

@@ -5,7 +5,7 @@
 # letsdo — локальный агент-работник задач Backlog.md/markdown.
 #
 # Тонкая обёртка над Letsdo::CLI: запускает агента по имени (промпт из
-# .agents/<имя>.md в корне проекта) через pi, либо выводит version/usage.
+# agents/<имя>.md в корне проекта) через pi, либо выводит version/usage.
 #
 # Использование:
 #   ./bin/letsdo <имя>     # запуск агента <имя> (код выхода pi)
@@ -15,11 +15,11 @@
 #   ./bin/letsdo --badopt  # «неизвестная опция» + usage, exit 1
 #
 # Окружение:
-#   LETSDO_ROOT       корень проекта с .agents/ (по умолчанию — текущая папка)
+#   LETSDO_ROOT       корень проекта с agents/ (по умолчанию — текущая папка)
 #   LETSDO_PI_FLAGS   дополнительные флаги pi (например: "--model anthropic/claude-sonnet-4-5")
 #   AGENT_PI_FLAGS    то же, для совместимости с bin/agent, если LETSDO_PI_FLAGS не задан
 #
-# Новый агент = новый файл .agents/<имя>.md, менять код не нужно.
+# Новый агент = новый файл agents/<имя>.md, менять код не нужно.
 #
 
 require_relative "../lib/letsdo"

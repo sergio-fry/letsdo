@@ -4,7 +4,7 @@ module Letsdo
   # Базовая ошибка пакета.
   class Error < StandardError; end
 
-  # Агент с таким именем не найден в .agents/.
+  # Агент с таким именем не найден в agents/.
   class UnknownAgentError < Error
     attr_reader :name
 
