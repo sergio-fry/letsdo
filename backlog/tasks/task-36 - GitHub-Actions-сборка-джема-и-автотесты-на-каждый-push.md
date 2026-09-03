@@ -1,11 +1,11 @@
 ---
 id: TASK-36
 title: 'GitHub Actions: сборка джема и автотесты на каждый push'
-status: In Progress
+status: Done
 assignee:
   - '@developer'
 created_date: '2026-09-03 20:26'
-updated_date: '2026-09-03 20:31'
+updated_date: '2026-09-03 20:33'
 labels: []
 dependencies: []
 ordinal: 25000
@@ -19,11 +19,11 @@ ordinal: 25000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 В репозитории есть .github/workflows/ci.yml с триггером на push (все ветки)
-- [ ] #2 Step «Сборка джема»: gem build letsdo.gemspec завершается успешно
-- [ ] #3 Step «Автотесты»: rake test завершается с 0 failures, 0 errors
-- [ ] #4 Workflow зелёный на main после добавления (проверено на GitHub Actions)
-- [ ] #5 Резолв Ruby-версии явный (>= 3.0, например 3.x) и совпадает с required_ruby_version джема
+- [x] #1 В репозитории есть .github/workflows/ci.yml с триггером на push (все ветки)
+- [x] #2 Step «Сборка джема»: gem build letsdo.gemspec завершается успешно
+- [x] #3 Step «Автотесты»: rake test завершается с 0 failures, 0 errors
+- [x] #4 Workflow зелёный на main после добавления (проверено на GitHub Actions)
+- [x] #5 Резолв Ruby-версии явный (>= 3.0, например 3.x) и совпадает с required_ruby_version джема
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -34,3 +34,15 @@ ordinal: 25000
 3. Verify locally by simulating CI steps exactly (gem build + rake test without bundler).
 4. Commit workflow + commit, push to origin/main, watch Actions run on GitHub until green (repo is public, checkable via API).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Workflow .github/workflows/ci.yml: on push (branches: **), ubuntu-latest, ruby/setup-ruby@v1 with matrix ruby 3.3 (matches gemspec required_ruby_version '>= 3.0'). Steps: checkout -> setup Ruby -> gem build letsdo.gemspec -> rake test. No bundler/bundle install — rake and minitest are default Ruby gems. Local CI simulation (env -i, no bundler): gem build OK, rake test 61 runs / 0 failures / 0 errors. GitHub Actions run #33802817912 on main (commit 086066e): conclusion success, job ci (3.3) — steps Build gem and Run tests both success.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added .github/workflows/ci.yml: on push (all branches), ubuntu-latest, explicit Ruby 3.3 matrix (satisfies gem's >= 3.0), steps: checkout -> setup-ruby -> 'gem build letsdo.gemspec' -> 'rake test'. No bundler used (tests use only built-in Minitest; rake/minitest ship as default Ruby gems). Verified: (1) local simulation without bundler — gem build OK, rake test 61 runs / 0 failures / 0 errors; (2) real run on GitHub Actions main commit 086066e — run #33802817912 success, both Build gem and Run tests steps green.
+<!-- SECTION:FINAL_SUMMARY:END -->
