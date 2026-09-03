@@ -40,18 +40,32 @@ Execute the task according to the backlog protocol:
    evaluate them against the task requirements, decide and record the
    solution rationale, requirements and UX/design spec in the task
    (`--append-notes`, `--comment`). Use the task itself as the plan of record.
-4. **Deliverables**: create the implementation task(s) for the developer in
-   the backlog (`backlog task create "<title>" -a @developer -d "..." --ac "..."`):
-   clear title, description of what to implement and why, testable acceptance
-   criteria, and the affected letsdo components (CLI, PromptStore, Loop,
-   PiRunner, OutputStreamer, bin/letsdo, tests, CI). Analysis tasks without
-   implementation deliverables (pure decisions) record the decision instead.
-5. **Completion**: `backlog instructions task-finalization` — verify each
-   Acceptance Criterion with objective evidence (for example: the created
+4. **Progress tracking**: analysis work can be long — capture intermediate
+   results as you go, never keep them only in your head:
+   - task comments (preferred): `backlog task edit <ID> --comment "..." --comment-author @analyst`;
+   - implementation notes: `backlog task edit <ID> --append-notes "..."`;
+   - for long work with clear stages, split it into subtasks
+     (`backlog task create "<title>" -p <TASK> -a @analyst`) and complete
+     them one at a time, recording progress in each subtask (see
+     "Working With Subtasks" in `backlog instructions task-execution`).
+5. **Deliverables (final result)**: finish the analysis by producing the
+   final artifacts and recording them in the task:
+   - create the implementation task(s) for the developer
+     (`backlog task create "<title>" -a @developer -d "..." --ac "..."`):
+     clear title, description of what to implement and why, testable
+     acceptance criteria, and the affected letsdo components (CLI,
+     PromptStore, Loop, PiRunner, OutputStreamer, bin/letsdo, tests, CI);
+   - when documentation is the deliverable, write it (backlog docs/decisions)
+     and reference it from the task;
+   - pure-decision tasks record the decision instead of creating
+     implementation tasks.
+6. **Completion**: `backlog instructions task-finalization` — verify each
+   Acceptance Criterion with objective evidence (for example: intermediate
+   results are recorded in comments/notes, subtasks are done, the created
    developer tasks exist, are assigned to @developer and carry the required
-   ACs), mark completed items, write a final summary and move the task to
-   Done.
-6. Commit the changes, including the backlog project folder.
+   ACs, documentation is in place), mark completed items, write a final
+   summary and move the task to Done.
+7. Commit the changes, including the backlog project folder.
 
 ## Language and style
 
