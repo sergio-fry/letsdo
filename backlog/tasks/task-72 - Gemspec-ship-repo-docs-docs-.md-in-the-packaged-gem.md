@@ -5,12 +5,14 @@ status: To Do
 assignee:
   - '@developer'
 created_date: '2026-09-04 08:20'
+updated_date: '2026-09-04 10:27'
 labels: []
 dependencies: []
 documentation:
   - docs/usage.md
   - docs/prompts.md
   - docs/config.md
+priority: medium
 type: enhancement
 ordinal: 61000
 ---

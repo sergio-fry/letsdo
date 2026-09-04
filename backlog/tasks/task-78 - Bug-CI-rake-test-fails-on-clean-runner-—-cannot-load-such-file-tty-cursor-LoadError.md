@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-04 09:30'
+updated_date: '2026-09-04 10:27'
 labels: []
 dependencies: []
 references:
@@ -16,6 +17,7 @@ references:
   - lib/letsdo/tui/input.rb
   - test/test_helper.rb
   - letsdo.gemspec
+priority: medium
 type: bug
 ordinal: 67000
 ---

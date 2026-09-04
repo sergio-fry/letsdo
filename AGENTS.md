@@ -44,6 +44,15 @@ Tests must not create files in the repo root either; temporary test output
 belongs under `/tmp` or a tmpdir. (Established after debug artifacts polluted
 the repo during TASK-42.)
 
+**Every backlog task must carry a priority (High / Medium / Low).** Set it at
+task creation: `backlog task create ... --priority High|Medium|Low`. When the
+creator does not choose, the default is Medium. Why: agent workers pick tasks
+from the priority-sorted queue (`backlog task list --sort priority`, ties
+broken by ordinal), so a task left without a priority silently falls to the
+bottom of the queue — the recurring mis-ordering this rule fixes (2026-09-04).
+The rule applies to all new and edited tasks; existing open tasks were
+backfilled to Medium.
+
 Canonical project description (single source of truth — reused by the README,
 gemspec, and project rules):
 

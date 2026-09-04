@@ -4,12 +4,14 @@ title: 'CI: automatic gem release on version tag (build, test, publish to RubyGe
 status: To Do
 assignee: []
 created_date: '2026-09-04 09:19'
+updated_date: '2026-09-04 10:27'
 labels: []
 dependencies: []
 references:
   - .github/workflows/ci.yml
   - letsdo.gemspec
   - TASK-36
+priority: medium
 ordinal: 65000
 ---
 

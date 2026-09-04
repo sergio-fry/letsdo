@@ -14,9 +14,9 @@ tasks yourself. End the run with a message that there are no tasks.
 ## Choosing a task
 
 Your open tasks are listed by the backlog CLI already sorted by priority
-(High → Medium → Low → tasks without a priority), then by position. That
-order is authoritative: take the first task — do not re-sort the list, do
-not judge importance yourself, do not pick by title, interest or size.
+(High → Medium → Low), then by position. That order is authoritative: take
+the first task — do not re-sort the list, do not judge importance yourself,
+do not pick by title, interest or size.
 
 1. List your tasks with
    `backlog task list --assignee @developer --exclude-status Done --sort priority --plain`

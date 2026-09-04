@@ -17,9 +17,9 @@ tasks yourself. End the run with a message that there are no tasks.
 ## Choosing a task
 
 Your open tasks are listed by the backlog CLI already sorted by priority
-(High → Medium → Low → tasks without a priority), then by position. That
-order is authoritative: take the first task — do not re-sort the list, do
-not judge importance yourself, do not pick by title, interest or size.
+(High → Medium → Low), then by position. That order is authoritative: take
+the first task — do not re-sort the list, do not judge importance yourself,
+do not pick by title, interest or size.
 
 1. List your tasks with
    `backlog task list --assignee @analyst --exclude-status Done --sort priority --plain`
@@ -49,16 +49,19 @@ Execute the task according to the backlog protocol:
    - task comments (preferred): `backlog task edit <ID> --comment "..." --comment-author @analyst`;
    - implementation notes: `backlog task edit <ID> --append-notes "..."`;
    - for long work with clear stages, split it into subtasks
-     (`backlog task create "<title>" -p <TASK> -a @analyst`) and complete
-     them one at a time, recording progress in each subtask (see
-     "Working With Subtasks" in `backlog instructions task-execution`).
+     (`backlog task create "<title>" -p <TASK> -a @analyst --priority <High|Medium|Low>`)
+     and complete them one at a time, recording progress in each subtask
+     (see "Working With Subtasks" in `backlog instructions task-execution`);
+     subtasks carry the same priority rule;
 5. **Deliverables (final result)**: finish the analysis by producing the
    final artifacts and recording them in the task:
    - create the implementation task(s) for the developer
-     (`backlog task create "<title>" -a @developer -d "..." --ac "..."`):
+     (`backlog task create "<title>" -a @developer -d "..." --ac "..." --priority <High|Medium|Low>`):
      clear title, description of what to implement and why, testable
      acceptance criteria, and the affected letsdo components (CLI,
      PromptStore, Loop, PiRunner, OutputStreamer, bin/letsdo, tests, CI);
+     every created task must carry a priority (project rule, AGENTS.md);
+     use Medium unless the work is clearly High or Low;
    - when documentation is the deliverable, write it (backlog docs/decisions)
      and reference it from the task;
    - pure-decision tasks record the decision instead of creating

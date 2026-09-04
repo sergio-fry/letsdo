@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-04 09:22'
+updated_date: '2026-09-04 10:27'
 labels: []
 dependencies: []
 references:
@@ -14,6 +15,7 @@ references:
   - lib/letsdo/tui/log_buffer.rb
   - lib/letsdo/tui/renderer.rb
   - test/output_streamer_test.rb
+priority: medium
 type: bug
 ordinal: 66000
 ---

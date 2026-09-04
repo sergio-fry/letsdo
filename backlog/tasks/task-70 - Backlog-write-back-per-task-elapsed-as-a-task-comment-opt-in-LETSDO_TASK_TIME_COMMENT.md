@@ -7,9 +7,11 @@ status: To Do
 assignee:
   - '@developer'
 created_date: '2026-09-04 08:10'
+updated_date: '2026-09-04 10:27'
 labels: []
 dependencies:
   - TASK-69
+priority: medium
 type: enhancement
 ordinal: 59000
 ---

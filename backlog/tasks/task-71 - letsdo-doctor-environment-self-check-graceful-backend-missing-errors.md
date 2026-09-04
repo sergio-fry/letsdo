@@ -5,12 +5,13 @@ status: To Do
 assignee:
   - '@developer'
 created_date: '2026-09-04 08:14'
-updated_date: '2026-09-04 08:15'
+updated_date: '2026-09-04 10:27'
 labels: []
 dependencies:
   - TASK-53
   - TASK-43
   - TASK-44
+priority: medium
 type: enhancement
 ordinal: 60000
 ---
