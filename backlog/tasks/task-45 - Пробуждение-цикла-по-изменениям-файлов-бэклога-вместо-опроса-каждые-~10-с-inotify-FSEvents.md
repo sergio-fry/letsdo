@@ -1,12 +1,13 @@
 ---
 id: TASK-45
 title: >-
-  Пробуждение цикла по изменениям файлов бэклога вместо опроса каждые ~10 с
+  Wake the loop on backlog file changes instead of polling every ~10 s
   (inotify/FSEvents)
 status: To Do
 assignee:
   - '@developer'
 created_date: '2026-09-03 21:17'
+updated_date: '2026-09-04 07:25'
 labels: []
 dependencies:
   - TASK-39
@@ -17,15 +18,15 @@ ordinal: 34000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Сейчас Letsdo::AgentLoop в режиме ожидания опрашивает бэклог раз в ~10 с (wait_seconds). Требование пользователя: использовать механизмы ОС для отслеживания изменений в папке бэклога — inotify (Linux), FSEvents (macOS) и т.п. — и реагировать оперативно: как только файлы бэклога изменились, цикл сразу просыпается, запускает поиск и выбор задачи, без ожидания 10-секундного интервала. Референс реализации: TASK-8 (Done) — старая bin/agent-loop следила за backlog/ через inotify (ctypes, select), исключала .locks, при недоступности inotify переходила на периодический опрос; свои же правки агента будили цикл, но перепроверка без открытых задач возвращала его в ожидание. Учесть: без внешних зависимостей (inotify через ctypes, как раньше) либо обоснованный выбор (listen/rb-fsevent); резервный опрос, если watch недоступен; исключение служебных каталогов (.locks); интеграция с interruptible sleeper/self-pipe AgentLoop — селект по wake-fd и watch-fd, чтобы SIGINT/SIGTERM оставались отзывчивыми; отсутствие ложных запусков от собственных правок агента (после пробуждения — перепроверка: нет открытых задач → снова ожидание).
+Currently Letsdo::AgentLoop polls the backlog once every ~10 s (wait_seconds) while in the wait mode. User requirement: use OS mechanisms to track changes in the backlog folder — inotify (Linux), FSEvents (macOS), etc. — and react promptly: as soon as backlog files change, the loop wakes up immediately, runs task search and selection, without waiting for the 10-second interval. Reference implementation: TASK-8 (Done) — the old bin/agent-loop watched backlog/ via inotify (ctypes, select), excluded .locks, and fell back to periodic polling when inotify was unavailable; the agent's own edits also woke the loop, but the re-check with no open tasks returned it to waiting. Take into account: no external dependencies (inotify via ctypes, as before) or a justified choice (listen/rb-fsevent); fallback polling when the watch is unavailable; excluding service directories (.locks); integration with the interruptible sleeper/self-pipe in AgentLoop — select on wake-fd and watch-fd so SIGINT/SIGTERM stay responsive; no false wake-ups from the agent's own edits (after waking — re-check: no open tasks → wait again).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 В режиме ожидания цикл блокируется на механизме ОС (inotify на Linux; FSEvents/резерв на macOS) и просыпается при изменении файлов backlog/ немедленно, без ожидания 10-секундного интервала
-- [ ] #2 После пробуждения выполняется перепроверка задач: открытые есть — агент берёт задачу; нет — цикл снова ждёт (собственные правки агента не запускают агента без открытых задач)
-- [ ] #3 Резервный периодический опрос (~10 с) сохраняется, когда watch недоступен (нет inotify/FSEvents)
-- [ ] #4 Реакция на SIGINT/SIGTERM остаётся быстрой в режиме ожидания (интеграция с interruptible sleeper/self-pipe Letsdo::AgentLoop)
-- [ ] #5 Служебные каталоги бэклога (например .locks) исключены из подписки
-- [ ] #6 Тесты: детерминированное пробуждение по изменению файла бэклога (watcher инжектируемый), резервный опрос, корректный stop; rake test зелёный (0 failures); rubocop 0 offenses
+- [ ] #1 While idle the loop blocks on the OS mechanism (inotify on Linux; FSEvents/fallback on macOS) and wakes immediately on backlog/ file changes, without waiting for the 10-second interval
+- [ ] #2 After waking, tasks are re-checked: if open tasks exist — the agent picks one; if not — the loop waits again (the agent's own edits do not start the agent without open tasks)
+- [ ] #3 The fallback periodic polling (~10 s) is kept when the watch is unavailable (no inotify/FSEvents)
+- [ ] #4 SIGINT/SIGTERM response stays fast while idle (integration with the interruptible sleeper/self-pipe in Letsdo::AgentLoop)
+- [ ] #5 Backlog service directories (e.g. .locks) are excluded from the watch subscription
+- [ ] #6 Tests: deterministic wake-up on a backlog file change (injectable watcher), fallback polling, correct stop; rake test green (0 failures); rubocop 0 offenses
 <!-- AC:END -->
