@@ -110,9 +110,31 @@ module Letsdo
       send_signal("TERM", pid) if pid
     end
 
-    # Stops a running pi: SIGTERM to its process group, then SIGKILL after
-    # the grace period if it did not exit. Safe to call when the run already
-    # finished (no-op).
+    # Freezes pi mid-run: SIGSTOP to its process group. The whole group
+    # (pi + any tool children) stops at the kernel level; letsdo's reader
+    # simply stays blocked on the pipe until #resume. Safe to call when no
+    # pi is running or the group is already gone (no-op, see #send_signal).
+    def pause
+      pid = @pid
+      send_signal("STOP", pid) if pid
+    end
+
+    # Resumes a paused pi: SIGCONT to its process group. A no-op on a
+    # process that is not stopped (SIGCONT is ignored by default then)
+    # and when the group is gone (see #send_signal).
+    def resume
+      pid = @pid
+      send_signal("CONT", pid) if pid
+    end
+
+    # Stops a running pi: SIGCONT, then SIGTERM to its process group, then
+    # SIGKILL after the grace period if it did not exit. Safe to call when
+    # the run already finished (no-op).
+    #
+    # SIGCONT first: a SIGSTOPped process does not process SIGTERM, so a
+    # paused run would otherwise stall for the whole grace period before
+    # SIGKILL. SIGCONT on a non-stopped process is a no-op, so it is safe
+    # to send unconditionally.
     #
     # @param signal [String] the first signal to send
     # @param grace [Float] seconds to wait before falling back to SIGKILL
@@ -120,6 +142,7 @@ module Letsdo
       pid = @pid
       return true unless pid
 
+      send_signal("CONT", pid)
       send_signal(signal, pid)
       deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + grace
       loop do

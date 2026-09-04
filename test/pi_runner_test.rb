@@ -142,4 +142,142 @@ class PiRunnerTest < Minitest::Test
     assert_equal 0, runner.run
     refute_nil runner.terminate
   end
+
+  # Whether the monotonic deadline has passed (used by the wait helpers
+  # below).
+  def overdue?(deadline)
+    Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+  end
+
+  # Waits for the fake pi to write its readiness file (it does so right
+  # before the final sleep, when the event stream is already written).
+  # Returns the child pid. Pausing only a fully-booted pi makes the
+  # stop/resume deterministic: SIGSTOP during the exec/bootstrap window is
+  # a kernel-level race.
+  def wait_for_ready(ready_file, timeout: 5)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+    loop do
+      return File.read(ready_file).to_i if File.exist?(ready_file)
+
+      flunk "fake pi did not become ready within #{timeout}s" if overdue?(deadline)
+      sleep 0.01
+    end
+  end
+
+  # Waits for the child to enter the stopped state (WUNTRACED reports it
+  # without reaping) and returns its Process::Status. Hang-guarded: the
+  # blocking wait runs in a helper thread with a join timeout.
+  def wait_stopped(pid, timeout: 5)
+    stopped = []
+    waiter = Thread.new { stopped << Process.waitpid2(pid, Process::WUNTRACED) }
+    flunk "pi (pid #{pid}) did not stop within #{timeout}s" unless waiter.join(timeout)
+    stopped.first.last
+  end
+
+  # Runs the fake pi in a background thread and returns [runner, thread,
+  # result_box, ready_file, old_sleep]; the caller controls
+  # pause/resume/terminate from the main thread, exactly like the input
+  # thread would in real use. result_box is a mutable Hash the worker
+  # writes into — reading it from the main thread always sees the latest
+  # value. ready_file receives the child pid once it is fully booted.
+  def run_pi_background(sleep_seconds)
+    runner = Letsdo::PiRunner.new(prompt: "You are an agent", streamer: @streamer, command: fake_pi)
+    old_sleep = ENV["FAKE_PI_SLEEP"]
+    ENV["FAKE_PI_SLEEP"] = sleep_seconds.to_s
+    ready_file = File.join(Dir.mktmpdir("letsdo-ready"), "ready")
+    old_ready = ENV["FAKE_PI_READY_FILE"]
+    ENV["FAKE_PI_READY_FILE"] = ready_file
+    result_box = { result: nil }
+    thread = Thread.new { result_box[:result] = runner.run }
+    [runner, thread, result_box, ready_file, old_sleep, old_ready]
+  end
+
+  def test_pause_stops_the_pi_group_mid_run
+    runner, thread, result_box, ready_file, old_sleep, old_ready = run_pi_background(300)
+    begin
+      pid = wait_for_ready(ready_file)
+      runner.pause
+
+      # The child enters the stopped state (SIGSTOP, observed without
+      # reaping) and the run does not progress while frozen.
+      status = wait_stopped(pid)
+      assert status.stopped?, "pi should be stopped, got #{status.inspect}"
+      assert_equal 19, status.stopsig, "stopped by SIGSTOP"
+      sleep 0.1
+      assert_nil result_box[:result], "run must not finish while paused"
+      assert thread.alive?
+    ensure
+      ENV["FAKE_PI_SLEEP"] = old_sleep
+      ENV["FAKE_PI_READY_FILE"] = old_ready
+      runner.terminate
+      thread.join(5)
+    end
+  end
+
+  def test_resume_continues_the_run_with_unchanged_exit_code
+    # Short sleep: after resume the fake pi completes on its own.
+    runner, thread, result_box, ready_file, old_sleep, old_ready = run_pi_background(3)
+    begin
+      pid = wait_for_ready(ready_file)
+      runner.pause
+      wait_stopped(pid)
+
+      runner.resume
+      thread.join(10)
+      refute thread.alive?, "resume did not let the run finish"
+      assert_equal 0, result_box[:result], "exit code must be unchanged after pause/resume"
+    ensure
+      ENV["FAKE_PI_SLEEP"] = old_sleep
+      ENV["FAKE_PI_READY_FILE"] = old_ready
+      runner.terminate
+      thread.join(5)
+    end
+  end
+
+  def test_pause_and_resume_are_noops_without_a_run
+    runner = Letsdo::PiRunner.new(prompt: "You are an agent", streamer: @streamer, command: fake_pi)
+    assert_nil runner.pause
+    assert_nil runner.resume
+    assert_equal 0, runner.run
+    # After the run finished @pid is cleared — still no-ops.
+    assert_nil runner.pause
+    assert_nil runner.resume
+  end
+
+  def test_pause_and_resume_swallow_esrch_for_a_dead_group
+    runner = Letsdo::PiRunner.new(prompt: "You are an agent", streamer: @streamer, command: fake_pi)
+    dead_pid = Process.spawn("true")
+    Process.wait(dead_pid)
+    runner.instance_variable_set(:@pid, dead_pid)
+
+    assert_nil runner.pause
+    assert_nil runner.resume
+  rescue Errno::ESRCH, Errno::EPERM
+    flunk "pause/resume must swallow ESRCH/EPERM like send_signal"
+  end
+
+  def test_terminate_kills_a_paused_pi_promptly
+    runner, thread, result_box, ready_file, old_sleep, old_ready = run_pi_background(300)
+    begin
+      pid = wait_for_ready(ready_file)
+      runner.pause
+      wait_stopped(pid)
+
+      # SIGCONT-before-SIGTERM: the frozen child must not stall for the
+      # whole 3s grace period.
+      start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      runner.terminate
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+      assert_operator elapsed, :<, 1.0, "terminate on a paused pi took #{elapsed.round(2)}s"
+
+      thread.join(10)
+      refute thread.alive?, "terminate did not stop the paused run"
+      assert_equal 143, result_box[:result], "killed by SIGTERM → 128 + 15"
+    ensure
+      ENV["FAKE_PI_SLEEP"] = old_sleep
+      ENV["FAKE_PI_READY_FILE"] = old_ready
+      runner.terminate
+      thread.join(5)
+    end
+  end
 end

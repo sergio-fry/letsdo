@@ -21,6 +21,10 @@
 #                       stub    — only toolcall_start without execution
 #                                  events ("⚙ name" fallback check).
 #
+#   FAKE_PI_READY_FILE  path: once set, the file is written right before
+#                       the final sleep — lets tests wait until the fake pi
+#                       is fully booted before pausing/terminating it.
+#
 
 require "json"
 
@@ -117,6 +121,10 @@ events =
   end
 
 events.each { |event| puts JSON.generate(event) }
+
+if (ready_file = ENV["FAKE_PI_READY_FILE"])
+  File.write(ready_file, Process.pid.to_s)
+end
 
 sleep Float(ENV.fetch("FAKE_PI_SLEEP", "0"))
 
