@@ -267,6 +267,31 @@ class CliTuiTest < CliTest
     assert_empty @err.string
   end
 
+  # TUI quit raises Letsdo::Stopped in the main thread (TASK-79 regression):
+  # when that lands while a backlog child is being captured, the child's
+  # pipe readers must not dump "stream closed in another thread" noise.
+  def test_tui_quit_prints_no_open3_thread_noise
+    code, tty_out, dumped = capture_tui_run('q', { count: 2 })
+
+    assert_equal 0, code
+    assert_includes tty_out.string, "\e[?1049h"
+    assert_empty @err.string
+    refute_includes dumped, 'stream closed'
+    refute_includes dumped, 'terminated with exception'
+  end
+
+  # Runs the TUI scenario with the process $stderr captured — thread dumps
+  # from report_on_exception go there, not to the injected @err stream.
+  def capture_tui_run(keys, extra = {})
+    real_stderr = $stderr
+    captured = StringIO.new
+    $stderr = captured
+    result = run_tui(keys, extra)
+    [*result, captured.string]
+  ensure
+    $stderr = real_stderr
+  end
+
   def test_tui_not_engaged_when_stdout_is_not_a_tty
     code = run_developer(count: 1, extra: { 'TERM' => 'xterm' })
 

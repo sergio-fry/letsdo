@@ -30,6 +30,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Session#quit` sets the stop flag before raising `Letsdo::Stopped`, so
   the input thread renders no frames during teardown.
 
+### Fixed
+
+- `rake test` no longer prints `Open3.capture3` reader-thread dumps
+  (`IOError: stream closed in another thread`): `Letsdo::BacklogTasks` now
+  captures the backlog CLI output through `Letsdo::Capture`, whose reader
+  threads tolerate the pipes being closed when a stop (TUI quit, signal)
+  interrupts an in-flight backlog call and whose cleanup reaps the child
+  even then. Verified green runs show only Minitest dots and the summary;
+  real failures and errors still print.
+
 ### Added
 
 - Gemspec metadata: `homepage`, `homepage_uri`, `source_code_uri`, `changelog_uri`,

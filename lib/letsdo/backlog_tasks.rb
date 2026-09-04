@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require 'json'
-require 'open3'
 require 'shellwords'
 
 module Letsdo
@@ -35,7 +34,7 @@ module Letsdo
     # @return [Array<Hash>, nil] open tasks; nil when the backlog is unreadable
     def call
       args = @env ? [@env, *command_line] : command_line
-      out, _err, status = Open3.capture3(*args, chdir: @cwd)
+      out, _err, status = Letsdo::Capture.new(*args, chdir: @cwd).run
       return nil unless status.success?
 
       tasks = JSON.parse(out)['tasks']
