@@ -18,16 +18,25 @@ module Letsdo
       Dir.glob(File.join(agents_dir, '*.md')).sort.map { |path| File.basename(path, '.md') }
     end
 
-    # Reads an agent prompt.
+    # Reads an agent prompt. There are no unknown agents: when
+    # agents/<name>.md is missing, the caller falls back to the built-in
+    # default prompt (Letsdo::DefaultPrompt) and announces it (see CLI).
     #
     # @param name [String] agent name
-    # @return [String] contents of agents/<name>.md
-    # @raise [UnknownAgentError] if there is no such agent
+    # @return [String, nil] contents of agents/<name>.md, nil when missing
     def read(name)
-      path = File.join(agents_dir, "#{name}.md")
-      raise UnknownAgentError, name unless File.file?(path)
+      path = agent_path(name)
+      return nil unless File.file?(path)
 
       File.read(path)
+    end
+
+    # Absolute path of an agent's prompt file, whether or not it exists.
+    #
+    # @param name [String] agent name
+    # @return [String] <root>/agents/<name>.md (resolved to an absolute path)
+    def agent_path(name)
+      File.expand_path(File.join(agents_dir, "#{name}.md"))
     end
 
     private

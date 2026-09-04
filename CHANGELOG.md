@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Built-in default prompt (`Letsdo::DefaultPrompt::TEXT`): `letsdo <name>`
+  starts the agent even without `agents/<name>.md` — the run falls back to
+  the built-in process-only prompt, and letsdo announces once on stderr
+  the exact path checked (`<root>/agents/<name>.md`) plus the
+  `letsdo <name> --init` placement hint. `UnknownAgentError` is removed:
+  with the fallback there are no unknown agents, the base `Letsdo::Error`
+  remains the package error surface.
 - Real pause semantics for the TUI 'p' key: mid-run the pi group is
   suspended at the kernel level (SIGSTOP via `Letsdo::PiRunner#pause`,
   resume via SIGCONT); between runs a shared `Letsdo::Control::PauseGate`

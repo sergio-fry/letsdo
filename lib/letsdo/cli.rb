@@ -12,7 +12,9 @@ module Letsdo
   #   letsdo --help                — usage, exit code 0;
   #   letsdo <name>                — run the <name> agent in the orchestrator
   #                                    loop until SIGINT/SIGTERM;
-  #   letsdo <unknown name>        — "Unknown agent: <name>" + list, exit 1;
+  #   letsdo <name> (no prompt)    — same, but on the built-in default prompt;
+  #                                    one-time notification on stderr
+  #                                    (path checked + 'letsdo <name> --init' hint);
   #   letsdo <unknown option>      — "letsdo: unknown option: X" + usage, exit 1.
   class CLI
     include CLILaunch
@@ -78,12 +80,17 @@ module Letsdo
     end
 
     def run_agent(name)
-      PromptStore.new(root: @root).read(name)
+      store = PromptStore.new(root: @root)
+      announce_default_prompt(name, store) if store.read(name).nil?
       tui? ? run_agent_tui(name) : run_agent_plain(name)
-    rescue UnknownAgentError => e
-      @stderr.puts(e.message)
-      print_agents
-      1
+    end
+
+    # One-time fallback notification (before the first loop message): names
+    # the exact path checked and the placement hint. The agent still starts
+    # — Letsdo::Agent falls back to the built-in default prompt itself.
+    def announce_default_prompt(name, store)
+      @stderr.puts("letsdo: no prompt for #{name} at #{store.agent_path(name)}")
+      @stderr.puts("letsdo: using the built-in default prompt (create a prompt file with 'letsdo #{name} --init')")
     end
 
     def tui?

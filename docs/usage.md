@@ -217,7 +217,7 @@ source of truth.
 | Code | Meaning |
 | --- | --- |
 | `0` | `--version` / `--help`; successful loop run and stop (incl. TUI `q`); `--init` created the prompt |
-| `1` | no arguments; unknown option; unknown agent name; `--init` on an existing/unsafe name |
+| `1` | no arguments; unknown option; `--init` on an existing/unsafe name |
 
 ## Next steps
 

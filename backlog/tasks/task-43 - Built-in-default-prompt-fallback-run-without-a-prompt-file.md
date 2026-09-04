@@ -1,11 +1,11 @@
 ---
 id: TASK-43
 title: Built-in default prompt + fallback run without a prompt file
-status: To Do
+status: Done
 assignee:
   - '@developer'
 created_date: '2026-09-03 21:13'
-updated_date: '2026-09-04 10:27'
+updated_date: '2026-09-04 13:11'
 labels: []
 dependencies: []
 priority: medium
@@ -37,10 +37,35 @@ Requirement origin: TASK-41 (analyst spike). Constraints — TASK-35 (all texts 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 letsdo <name> with no agents/<name>.md starts the agent using the built-in default prompt: the fake pi receives Letsdo::DefaultPrompt::TEXT as the prompt; the orchestrator loop behavior is unchanged (N open tasks -> N runs, wait when none, clean stop) — TASK-39 shape intact
-- [ ] #2 One-time notification on stderr, before the first loop message, listing exactly the checked path <root>/agents/<name>.md and the hint 'letsdo <name> --init'; exactly once per process; a run with an existing prompt file prints no notification
-- [ ] #3 Letsdo::PromptStore#read returns nil for a missing agent (no raise) and #agent_path returns the absolute path of agents/<name>.md; existing prompt-store tests updated
-- [ ] #4 Letsdo::DefaultPrompt::TEXT exists in lib/letsdo/default_prompt.rb and equals the canonical <---8<--- block from TASK-41 comment #3; lib/letsdo.rb requires it
-- [ ] #5 Letsdo::Errors: UnknownAgentError removed together with its tests; Letsdo::Error kept; no UnknownAgentError references remain in lib/ or test/
-- [ ] #6 rake test green (0 failures); rubocop on lib/, bin/, test/ — 0 offenses (TASK-37); README documents the fallback; all texts in English (TASK-35)
+- [x] #1 letsdo <name> with no agents/<name>.md starts the agent using the built-in default prompt: the fake pi receives Letsdo::DefaultPrompt::TEXT as the prompt; the orchestrator loop behavior is unchanged (N open tasks -> N runs, wait when none, clean stop) — TASK-39 shape intact
+- [x] #2 One-time notification on stderr, before the first loop message, listing exactly the checked path <root>/agents/<name>.md and the hint 'letsdo <name> --init'; exactly once per process; a run with an existing prompt file prints no notification
+- [x] #3 Letsdo::PromptStore#read returns nil for a missing agent (no raise) and #agent_path returns the absolute path of agents/<name>.md; existing prompt-store tests updated
+- [x] #4 Letsdo::DefaultPrompt::TEXT exists in lib/letsdo/default_prompt.rb and equals the canonical <---8<--- block from TASK-41 comment #3; lib/letsdo.rb requires it
+- [x] #5 Letsdo::Errors: UnknownAgentError removed together with its tests; Letsdo::Error kept; no UnknownAgentError references remain in lib/ or test/
+- [x] #6 rake test green (0 failures); rubocop on lib/, bin/, test/ — 0 offenses (TASK-37); README documents the fallback; all texts in English (TASK-35)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. NEW lib/letsdo/default_prompt.rb: Letsdo::DefaultPrompt::TEXT (frozen) = canonical text from TASK-41 comment #3 (between the 8< markers); require it in lib/letsdo.rb and update the structure comment.
+2. PromptStore: #read(name) -> nil when agents/<name>.md missing (drop raise + @raise doc); add #agent_path(name) -> absolute path. #create_agent stays out of scope (TASK-44).
+3. Agent#run: prompt = PromptStore#read(name) || DefaultPrompt::TEXT; drop UnknownAgentError from docs.
+4. CLI#run_agent: remove the rescue UnknownAgentError branch; when read(name) is nil print both notification lines once to stderr before the loop starts (exact strings from TASK-41 #2); loop (AgentLoop) untouched.
+5. errors.rb: remove UnknownAgentError, keep Letsdo::Error.
+6. Tests: prompt_store_test (read -> nil incl. no agents/, agent_path absolute; drop 3 UnknownAgentError tests), agent_test (unknown name -> fake pi argv last == DefaultPrompt::TEXT; drop 2 raise tests), cli_test (replace unknown-agent tests: missing-prompt run proceeds into loop, both notification lines exactly once on stderr before first loop message, existing prompt -> no notification).
+7. Docs: bin/letsdo header (fallback + one-time announcement), README code-structure already has DefaultPrompt (verify suffices), docs/usage.md exit-code table drops 'unknown agent name', CHANGELOG Added entry.
+8. Verify: rake test 0 failures, rubocop --no-server lib bin test 0 offenses, commit incl. backlog folder.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Validation: rake test = 181 runs, 579 assertions, 0 failures, 0 errors, 0 skips. rubocop --no-server lib bin test = 47 files, no offenses. Manual smoke run: 'letsdo newcomer' with no agents/newcomer.md printed the two notification lines once (exact path /tmp/.../agents/newcomer.md + 'letsdo newcomer --init' hint), then the loop waited and retried as before; notification not repeated. AC4: verified programmatically that DefaultPrompt::TEXT content matches the canonical 8< block in TASK-41 comment #3 (whitespace-normalized equality; padding blank lines around the fenced block excluded; TEXT frozen, starts with '# Task agent', ends with '- Do not complete several tasks in one run.'). docs/usage.md exit-code table no longer lists 'unknown agent name' (no unknown agents anymore); CHANGELOG.md gains an 'Added' entry.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+--help
+<!-- SECTION:FINAL_SUMMARY:END -->

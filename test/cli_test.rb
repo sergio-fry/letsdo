@@ -155,21 +155,45 @@ class CliUsageTest < CliTest
     assert_includes @err.string, 'letsdo: unknown option: --badopt'
   end
 
-  def test_unknown_agent_prints_error_and_agents
-    code = run_cli(['nosuch'], prompts: { 'developer' => 'x', 'looptest' => 'y' })
+  def test_missing_prompt_run_still_runs_the_loop
+    env = fake_backlog_env(scenario: 'empty', extra: { 'LETSDO_PI_COMMAND' => fake_pi })
+    code = run_cli(['nosuch'], prompts: { 'developer' => 'x' }, env: env, sleeper: stop_on_first_wait)
 
-    assert_equal 1, code
-    assert_includes @err.string, 'Unknown agent: nosuch'
-    assert_includes @out.string, 'Available agents:'
-    assert_includes @out.string, 'developer'
-    assert_includes @out.string, 'looptest'
+    assert_equal 0, code
+    # The run proceeded into the loop (it waited for tasks) and exited cleanly
+    # on the stop — it did not fail before the loop as the old unknown-agent
+    # path did.
+    assert_includes @err.string, 'letsdo: no open tasks for nosuch'
   end
 
-  def test_unknown_agent_fails_before_the_loop
-    code = run_cli(['nosuch'], prompts: { 'developer' => 'x' })
+  def test_missing_prompt_notifies_once_with_path_and_hint
+    env = fake_backlog_env(scenario: 'empty', extra: { 'LETSDO_PI_COMMAND' => fake_pi })
+    run_cli(['nosuch'], prompts: { 'developer' => 'x' }, env: env, sleeper: stop_on_first_wait)
 
-    assert_equal 1, code
-    assert_includes @err.string, 'Unknown agent: nosuch'
+    path_line = 'letsdo: no prompt for nosuch at '
+    hint_line = 'letsdo: using the built-in default prompt (create a prompt file with \'letsdo nosuch --init\')'
+    # Both lines appear exactly once, and name the exact path checked.
+    assert_equal 1, @err.string.scan(path_line).size
+    assert_equal 1, @err.string.scan(hint_line).size
+    assert_match %r{letsdo: no prompt for nosuch at (?:/.*)?/agents/nosuch\.md\n}, @err.string
+  end
+
+  def test_missing_prompt_notification_precedes_first_loop_message
+    env = fake_backlog_env(scenario: 'empty', extra: { 'LETSDO_PI_COMMAND' => fake_pi })
+    run_cli(['nosuch'], prompts: { 'developer' => 'x' }, env: env, sleeper: stop_on_first_wait)
+
+    notify_at = @err.string.index('letsdo: no prompt for nosuch at ')
+    loop_at = @err.string.index('letsdo: no open tasks for nosuch')
+    refute_nil notify_at
+    refute_nil loop_at
+    assert_operator notify_at, :<, loop_at
+  end
+
+  def test_existing_prompt_prints_no_notification
+    code = run_developer(scenario: 'empty')
+
+    assert_equal 0, code
+    refute_includes @err.string, 'letsdo: no prompt for developer'
   end
 end
 
@@ -190,6 +214,19 @@ class CliRunTest < CliTest
     assert_equal 0, code
     assert_includes @err.string, 'letsdo: no open tasks for developer'
     assert_equal '', @out.string
+  end
+
+  def test_missing_prompt_run_still_executes_tasks_with_default_prompt
+    with_argv_file('FAKE_PI_ARGV_FILE') do |path|
+      env = fake_backlog_env(scenario: 'open', count: 2, extra: { 'LETSDO_PI_COMMAND' => fake_pi })
+      code = run_cli(['nosuch'], prompts: {}, env: env, sleeper: stop_on_first_wait)
+
+      assert_equal 0, code
+      # The prompt text is multi-line, so the argv record spans newlines and
+      # puts appends no separator after it: assert the exact two records.
+      record = "--mode|json|#{Letsdo::DefaultPrompt::TEXT}"
+      assert_equal record * 2, File.read(path)
+    end
   end
 
   def test_agent_exit_code_is_logged_but_not_propagated

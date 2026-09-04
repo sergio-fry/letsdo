@@ -33,28 +33,31 @@ class PromptStoreTest < Minitest::Test
     end
   end
 
-  def test_read_unknown_agent_raises
+  def test_read_returns_nil_for_missing_agent
     with_project('developer' => 'You are a developer.') do |root|
       store = Letsdo::PromptStore.new(root: root)
 
-      error = assert_raises(Letsdo::UnknownAgentError) { store.read('nosuch') }
-      assert_equal 'nosuch', error.name
-      assert_match(/Unknown agent: nosuch/, error.message)
+      assert_nil store.read('nosuch')
     end
   end
 
-  def test_read_unknown_agent_raises_even_when_no_agents_dir
+  def test_read_returns_nil_when_no_agents_dir
     with_empty_project do |root|
-      error = assert_raises(Letsdo::UnknownAgentError) { Letsdo::PromptStore.new(root: root).read('x') }
-      refute_nil error
+      assert_nil Letsdo::PromptStore.new(root: root).read('x')
     end
   end
 
-  def test_unknown_agent_error_is_a_letsdo_error
+  def test_agent_path_is_absolute_and_predictable
     with_empty_project do |root|
-      error = assert_raises(Letsdo::UnknownAgentError) { Letsdo::PromptStore.new(root: root).read('x') }
-      assert_kind_of Letsdo::Error, error
-      assert_kind_of StandardError, error
+      store = Letsdo::PromptStore.new(root: root)
+
+      assert_equal File.join(File.expand_path(root), 'agents', 'nosuch.md'), store.agent_path('nosuch')
+    end
+  end
+
+  def test_agent_path_works_without_agents_dir
+    with_empty_project do |root|
+      assert_match %r{/agents/nosuch\.md\z}, Letsdo::PromptStore.new(root: root).agent_path('nosuch')
     end
   end
 end

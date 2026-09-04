@@ -3,11 +3,12 @@
 # The Letsdo package — a local agent worker for Backlog.md/markdown tasks.
 #
 # OOP structure:
-#   Letsdo::Errors           - error hierarchy (UnknownAgentError and others)
+#   Letsdo::Errors           - error hierarchy (Letsdo::Error and others)
 #   Letsdo::PromptStore      - access to agents/*.md prompts
+#   Letsdo::DefaultPrompt    - the built-in default prompt (fallback run, --init template)
 #   Letsdo::OutputStreamer   - where and how agent text and service lines are printed
 #   Letsdo::PiRunner         - running pi --mode json and parsing the event stream
-#   Letsdo::Agent            - a single agent run: prompt from agents/ + pi
+#   Letsdo::Agent            - a single agent run: prompt from agents/ or default + pi
 #   Letsdo::Capture          - interruption-safe child stdout/stderr capture
 #   Letsdo::BacklogTasks     - open tasks from the backlog CLI (the task provider)
 #   Letsdo::Loop             - generic orchestrator: tasks → runs → waiting
@@ -22,6 +23,7 @@
 require_relative 'letsdo/version'
 require_relative 'letsdo/errors'
 require_relative 'letsdo/prompt_store'
+require_relative 'letsdo/default_prompt'
 require_relative 'letsdo/output_streamer'
 require_relative 'letsdo/pi_runner'
 require_relative 'letsdo/agent'

@@ -60,18 +60,23 @@ class AgentTest < Minitest::Test
     end
   end
 
-  def test_run_unknown_agent_raises
+  def test_run_unknown_agent_uses_default_prompt
     with_project('developer' => 'You are a developer.') do |root|
-      assert_raises(Letsdo::UnknownAgentError) { make_agent(name: 'nosuch', root: root).run }
+      argv = captured_argv(make_agent(name: 'nosuch', root: root))
+
+      assert_equal Letsdo::DefaultPrompt::TEXT, argv.split('|').last
     end
   end
 
-  def test_run_unknown_agent_writes_nothing
+  def test_run_unknown_agent_streams_output_like_a_known_one
     with_project('developer' => 'You are a developer.') do |root|
-      assert_raises(Letsdo::UnknownAgentError) { make_agent(name: 'nosuch', root: root).run }
+      make_agent(name: 'nosuch', root: root).run
 
-      assert_empty @out.string
-      assert_empty @err.string
+      assert_equal "Hello, world!\n", @out.string
     end
+  end
+
+  def test_default_prompt_constant_is_frozen
+    assert_predicate Letsdo::DefaultPrompt::TEXT, :frozen?
   end
 end
