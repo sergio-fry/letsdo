@@ -22,3 +22,22 @@ Do not edit Backlog task, draft, document, decision, or milestone markdown files
 
 </CRITICAL_INSTRUCTION>
 <!-- BACKLOG.MD GUIDELINES END -->
+
+## Conventions
+
+**Task tracking is done in English.** All tracked artifacts — task titles and
+descriptions, acceptance criteria, notes and comments, drafts, milestones,
+decisions, and backlog documentation — are written in English.
+
+Why: consistency across the project (the English-only convention was
+established in TASK-35), open-source readiness (a readable, uniform backlog
+lowers the barrier for external contributors), and one language inside every
+tracked artifact instead of a mix. The rule matches the project convention and
+applies only to tracked artifacts; user conversations may stay in any language.
+Existing backlog history (tasks already written in Russian, open or closed) is
+left as-is — this rule governs new and edited entries only.
+
+Canonical project description (single source of truth — reused by the README,
+gemspec, and project rules):
+
+> A local agent worker for Backlog.md/markdown tasks.
