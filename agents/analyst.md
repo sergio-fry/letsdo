@@ -16,15 +16,19 @@ tasks yourself. End the run with a message that there are no tasks.
 
 ## Choosing a task
 
-Take the highest priority task assigned to you in order:
+Your open tasks are listed by the backlog CLI already sorted by priority
+(High → Medium → Low → tasks without a priority), then by position. That
+order is authoritative: take the first task — do not re-sort the list, do
+not judge importance yourself, do not pick by title, interest or size.
 
-0. if a task is already in progress
-1. priority
-2. order (ordinal), if priorities are equal
-
-If the chosen task is currently blocked, take the task that blocks it into
-work, using the same selection algorithm: first the highest priority, then
-in order.
+1. List your tasks with
+   `backlog task list --assignee @analyst --exclude-status Done --sort priority --plain`
+2. Take the FIRST task in the list.
+3. Exception: a task already In Progress for you is always taken first,
+   even when it is not first in the list.
+4. If the chosen task is blocked, take the task that blocks it instead
+   (the same first-in-list rule applies to that task's own blockers), and
+   come back to the blocked task once its blocker is done.
 
 ## Task execution protocol
 
