@@ -9,8 +9,13 @@ module Letsdo
   #   task provider       — open tasks assigned to the agent's handle
   #                         (Letsdo::BacklogTasks by default);
   #   agent run           — one Letsdo::Agent run per open task;
-  #   signals             — SIGINT/SIGTERM stop the loop: a running pi child
-  #                         is terminated and the process exits with 0.
+  #   signals             — SIGINT/SIGTERM/SIGHUP stop the loop: a running
+  #                         pi child is terminated and the process exits
+  #                         with 0;
+  #   pause gate          — a shared Letsdo::Control::PauseGate polled
+  #                         before each run: between-runs pause (the TUI's
+  #                         'p' key) holds new runs until resume while
+  #                         Letsdo::Loop stays generic.
   #
   # Waiting is interruptible: stop signals are delivered as
   # Letsdo::Stopped raised from the trap, so the loop unwinds right away
@@ -21,7 +26,9 @@ module Letsdo
   # exit codes, stopped.
   class AgentLoop
     STOP = :letsdo_stop
-
+    # Poll interval for the pause gate between runs (keeps the CPU idle
+    # while staying responsive to resume).
+    PAUSE_POLL_SECONDS = 0.05
     # @param name [String] agent name (for messages)
     # @param handle [String] assignee handle of the agent (e.g. "@developer")
     # @param agent [Letsdo::Agent, nil] agent to run once per task (its
@@ -40,9 +47,14 @@ module Letsdo
     #        on every provider call and run_started/run_finished around
     #        each agent run; nil in plain mode, so plain behavior is
     #        byte-identical
+    # @param pause_gate [Letsdo::Control::PauseGate, nil] between-runs pause
+    #        flag: while paused, no new run is started (the loop polls the
+    #        gate before run_started); nil (plain mode) = no-op, so plain
+    #        behavior stays byte-identical
     # @param debug [Boolean, nil] trace [letsdo] lines to stderr; nil = LETSDO_DEBUG
     def initialize(name:, handle:, agent: nil, run_one: nil, task_provider:,
-                   wait_seconds: 10.0, sleeper: nil, stderr: $stderr, metrics: nil, debug: nil)
+                   wait_seconds: 10.0, sleeper: nil, stderr: $stderr, metrics: nil,
+                   pause_gate: nil, debug: nil)
       @name = name
       @handle = handle
       @agent = agent
@@ -51,6 +63,7 @@ module Letsdo
       @wait_seconds = wait_seconds
       @stderr = stderr
       @metrics = metrics
+      @pause_gate = pause_gate
       @debug = debug.nil? ? ENV["LETSDO_DEBUG"] == "1" : debug
       @sleeper = sleeper || ->(seconds) { sleep(seconds) }
     end
@@ -129,8 +142,15 @@ module Letsdo
     # One agent run per task; a non-zero exit code is noted but the loop
     # continues. Metrics events bracket the run so the TUI can count done
     # tasks and show the running one with its elapsed time.
+    #
+    # The pause gate is polled first: while paused (between runs) the new
+    # run does not start and the loop waits on the gate instead. The wait
+    # is interruptible exactly like the waiting-for-tasks sleep — a stop
+    # arrives as Letsdo::Stopped raised into the main thread or a throw
+    # of the injected sleeper, so quitting while paused is prompt.
     def wrapped_run
       lambda do |task|
+        wait_while_paused
         @metrics&.run_started(task_label(task))
         @stderr.puts("letsdo: running #{@name} for #{task_label(task)}")
         debug("running agent for task #{task_label(task)}")
@@ -157,14 +177,31 @@ module Letsdo
       ->(seconds) { sleep(seconds) }
     end
 
+    # Blocks while the pause gate is on: no new run starts until #resume.
+    # The poll sleeper (default plain sleep) is interruptible like any
+    # other waiting — Letsdo::Stopped raised into the main thread (a stop
+    # signal or the TUI's 'q') unwinds the gate wait right away.
+    def wait_while_paused
+      return unless @pause_gate
+
+      while @pause_gate.paused?
+        @sleeper.call(PAUSE_POLL_SECONDS)
+      end
+    end
+
     def install_signal_handlers
       Signal.trap("SIGINT", method(:on_signal))
       Signal.trap("SIGTERM", method(:on_signal))
+      # Terminal closed (SSH session died, terminal app killed): the same
+      # stop path as INT/TERM so a closed terminal cannot leave an
+      # orphaned pi group behind.
+      Signal.trap("SIGHUP", method(:on_signal))
     end
 
     def restore_signal_handlers
       Signal.trap("SIGINT", "DEFAULT")
       Signal.trap("SIGTERM", "DEFAULT")
+      Signal.trap("SIGHUP", "DEFAULT")
     end
   end
 end

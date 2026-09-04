@@ -11,6 +11,7 @@
 #   Letsdo::BacklogTasks     - open tasks from the backlog CLI (the task provider)
 #   Letsdo::Loop             - generic orchestrator: tasks → runs → waiting
 #   Letsdo::AgentLoop        - letsdo wiring: provider + agent + signals + messages
+#   Letsdo::Control          - agent-control primitives (PauseGate)
 #   Letsdo::Tui              - the interactive TUI (LogBuffer, Metrics,
 #                              Renderer, Terminal, Input, Session)
 #   Letsdo::CLI              - command-line arguments, usage, exit code
@@ -26,5 +27,6 @@ require_relative "letsdo/agent"
 require_relative "letsdo/backlog_tasks"
 require_relative "letsdo/loop"
 require_relative "letsdo/agent_loop"
+require_relative "letsdo/control"
 require_relative "letsdo/tui"
 require_relative "letsdo/cli"

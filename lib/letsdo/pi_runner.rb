@@ -44,6 +44,7 @@ module Letsdo
       @streamer = streamer
       @command = command
       @pending_tools = {}
+      @reaped_status = nil
       @debug = debug.nil? ? ENV["LETSDO_DEBUG"] == "1" : debug
     end
 
@@ -78,7 +79,7 @@ module Letsdo
         # and reap it before propagating the stop.
         debug("stopped by signal, terminating pi")
         terminate
-        status = wait_status(@pid)
+        wait_status(@pid)
         @streamer.finish
         raise
       ensure
@@ -96,6 +97,7 @@ module Letsdo
       exit_code(status)
     ensure
       @pid = nil
+      @reaped_status = nil
     end
 
     def debug(message)
@@ -136,8 +138,18 @@ module Letsdo
     # SIGKILL. SIGCONT on a non-stopped process is a no-op, so it is safe
     # to send unconditionally.
     #
+    # Death is detected with two complementary probes, so the wait is
+    # prompt in both stop shapes: a WNOHANG reap catches a signal-killed
+    # child that is still a zombie (kill(0) would see it as alive and
+    # stall out the whole grace before SIGKILL); the kill(0) probe catches
+    # a child a concurrent reaper (the run thread after EOF) already
+    # collected. The reaped status is remembered so the caller's later
+    # #wait_status still reports it.
+    #
     # @param signal [String] the first signal to send
     # @param grace [Float] seconds to wait before falling back to SIGKILL
+    # @return [Process::Status, true] the reaped status, or true when there
+    #         was nothing to stop (no-op)
     def terminate(signal: "TERM", grace: 3.0, tick: 0.05)
       pid = @pid
       return true unless pid
@@ -146,11 +158,17 @@ module Letsdo
       send_signal(signal, pid)
       deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + grace
       loop do
+        status = wait_status(pid, nonblock: true)
+        return status if status
         break unless alive?(pid)
 
         if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
           send_signal("KILL", pid)
-          break
+          # One last tick for SIGKILL to be delivered and the child to
+          # die, then reap it before giving up.
+          sleep(tick)
+          status = wait_status(pid, nonblock: true)
+          return status || true
         end
         sleep(tick)
       end
@@ -253,9 +271,17 @@ module Letsdo
       nil
     end
 
-    def wait_status(pid)
-      _, status = Process.wait2(pid)
+    # Reaps the pi child and returns its status. Non-blocking when
+    # requested (the grace loop in #terminate polls this way). When the
+    # child was already reaped (Errno::ECHILD — by #terminate), the status
+    # it reaped is returned instead, so the exit code stays accurate even
+    # for concurrent callers.
+    def wait_status(pid, nonblock: false)
+      _, status = Process.wait2(pid, nonblock ? Process::WNOHANG : 0)
+      @reaped_status = status if status
       status
+    rescue Errno::ECHILD
+      @reaped_status
     end
 
     # Sends a signal to the pi process group. Missing/killed groups are
@@ -266,7 +292,8 @@ module Letsdo
       nil
     end
 
-    # Whether the pi process still exists (does not reap it).
+    # Whether the pi process still exists and is not yet reaped (kill(0)
+    # probes the process table without reaping).
     def alive?(pid)
       Process.kill(0, pid)
       true
@@ -275,6 +302,8 @@ module Letsdo
     end
 
     def exit_code(status)
+      return 1 if status.nil?
+
       return status.exitstatus if status.exitstatus
 
       status.termsig ? 128 + status.termsig : 1

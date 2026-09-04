@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Real pause semantics for the TUI 'p' key: mid-run the pi group is
+  suspended at the kernel level (SIGSTOP via `Letsdo::PiRunner#pause`,
+  resume via SIGCONT); between runs a shared `Letsdo::Control::PauseGate`
+  holds new runs until resume. The footer flips between `p pause` and
+  `p resume`.
+- `SIGHUP` (terminal closed) stops the loop the same way as `SIGINT`/
+  `SIGTERM`.
+- Prompt stop of a paused pi: `PiRunner#terminate` now reaps the child
+  during its grace wait (WNOHANG) instead of polling the process table,
+  so a signal-killed child's zombie state can no longer stall the stop
+  for the full grace period.
+
+### Changed
+
+- `Session#quit` sets the stop flag before raising `Letsdo::Stopped`, so
+  the input thread renders no frames during teardown.
+
+### Added
+
 - Gemspec metadata: `homepage`, `homepage_uri`, `source_code_uri`, `changelog_uri`,
   `allowed_push_host`.
 - `CHANGELOG.md`.

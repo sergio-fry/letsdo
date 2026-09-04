@@ -138,14 +138,20 @@ module Letsdo
                         command: pi_command)
       provider = BacklogTasks.new(handle: handle, command: backlog_command, cwd: @root,
                                   env: ENV.to_h.merge(@env))
+      # The shared pause gate: 'p' in the TUI toggles it (between-runs
+      # pause, no new run starts) and pauses/resumes the running pi via
+      # the agent runner (mid-run SIGSTOP/SIGCONT); the loop polls it
+      # before every run.
+      pause_gate = Letsdo::Control::PauseGate.new
       loop = AgentLoop.new(name: name, handle: handle, agent: agent,
                            task_provider: -> { provider.call },
                            wait_seconds: wait_seconds, sleeper: @sleeper, stderr: log,
-                           metrics: metrics)
+                           metrics: metrics, pause_gate: pause_gate)
       session = Tui::Session.new(name: name, handle: handle, log: log, metrics: metrics,
                                  terminal: terminal, input: input,
                                  refresh: -> { provider.call },
-                                 wait_seconds: wait_seconds, clock: clock)
+                                 wait_seconds: wait_seconds, clock: clock,
+                                 pause_gate: pause_gate, runner: -> { agent.runner })
       session.run { loop.run }
     end
 

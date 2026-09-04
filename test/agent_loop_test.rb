@@ -6,7 +6,8 @@ require "stringio"
 class AgentLoopTest < Minitest::Test
   # Builds an AgentLoop with injected fakes and a sleeper that stops the
   # loop on its first wait (throw). Returns [loop, stderr].
-  def make_loop(provider:, run_one:, wait_seconds: 0.5, sleeper: nil, stderr: nil)
+  def make_loop(provider:, run_one:, wait_seconds: 0.5, sleeper: nil, stderr: nil,
+                pause_gate: nil)
     stderr ||= StringIO.new
     sleeper ||= lambda do |_seconds|
       throw Letsdo::AgentLoop::STOP
@@ -14,7 +15,8 @@ class AgentLoopTest < Minitest::Test
     loop_obj = Letsdo::AgentLoop.new(
       name: "developer", handle: "@developer",
       run_one: run_one, task_provider: provider,
-      wait_seconds: wait_seconds, sleeper: sleeper, stderr: stderr
+      wait_seconds: wait_seconds, sleeper: sleeper, stderr: stderr,
+      pause_gate: pause_gate
     )
     [loop_obj, stderr]
   end
@@ -145,6 +147,85 @@ class AgentLoopTest < Minitest::Test
     assert_equal [[:provider, nil]], metrics.events
   end
 
+  # --- pause gate (TASK-74) --------------------------------------------
+
+  # A sleeper that distinguishes the two waiting spots by their interval:
+  # the gate poll sleeps briefly (PAUSE_POLL_SECONDS), the no-tasks wait
+  # receives @wait_seconds and throws — stopping the loop after a resume.
+  def gated_sleeper(wait_seconds:)
+    ->(seconds) do
+      if seconds == wait_seconds
+        throw Letsdo::AgentLoop::STOP
+      else
+        sleep(seconds)
+      end
+    end
+  end
+
+  def test_pause_gate_defaults_to_noop
+    # No gate passed: the loop runs tasks exactly as before — the default
+    # sleeper (which stops on ANY wait) is never invoked for a gated run.
+    runs = []
+    provider = once_provider([{ "id" => "TASK-1" }])
+    loop_obj, = make_loop(provider: provider, run_one: ->(_task) { runs << :run; 0 })
+
+    assert_equal 0, loop_obj.run
+    assert_equal 1, runs.length
+  end
+
+  def test_paused_gate_blocks_new_runs_until_resume
+    gate = Letsdo::Control::PauseGate.new
+    gate.pause
+    runs = []
+    provider = once_provider([{ "id" => "TASK-1" }])
+    loop_obj, = make_loop(provider: provider, wait_seconds: 0.3,
+                          run_one: ->(_task) { runs << :run; 0 },
+                          sleeper: gated_sleeper(wait_seconds: 0.3), pause_gate: gate)
+
+    thread = Thread.new { loop_obj.run }
+    sleep 0.2 # the loop is polling the gate now
+    assert_empty runs, "no run may start while paused"
+
+    gate.resume
+    thread.join(5)
+    refute thread.alive?, "loop did not stop after resume + empty backlog"
+    assert_equal 1, runs.length, "the queued task must run after resume"
+  end
+
+  def test_stop_throws_interrupt_the_gate_wait
+    gate = Letsdo::Control::PauseGate.new
+    gate.pause
+    provider = once_provider([{ "id" => "TASK-1" }])
+    # A sleeper that stops on its FIRST call — i.e. on the first gate poll:
+    # quitting while paused must unwind immediately, not wait for resume.
+    loop_obj, stderr = make_loop(provider: provider,
+                                 run_one: ->(_task) { 0 },
+                                 sleeper: ->(_seconds) { throw Letsdo::AgentLoop::STOP },
+                                 pause_gate: gate)
+
+    assert_equal 0, loop_obj.run
+    assert_includes stderr.string, "letsdo: stopped"
+  end
+
+  def test_stopped_raised_into_the_loop_interrupts_the_gate_wait
+    gate = Letsdo::Control::PauseGate.new
+    gate.pause
+    provider = once_provider([{ "id" => "TASK-1" }])
+    loop_obj, stderr = make_loop(provider: provider, wait_seconds: 0.3,
+                                 run_one: ->(_task) { 0 },
+                                 sleeper: ->(seconds) { sleep(seconds) },
+                                 pause_gate: gate)
+
+    thread = Thread.new { loop_obj.run }
+    sleep 0.2 # the loop is now asleep on the gate poll
+    thread.raise(Letsdo::Stopped) # the same delivery the trap/'q' uses
+    thread.join(5)
+    refute thread.alive?, "Letsdo::Stopped did not interrupt the gate wait"
+    assert_includes stderr.string, "letsdo: stopped"
+  ensure
+    thread&.kill if thread&.alive?
+  end
+
   # --- signal handling (real process, real signals) ----------------------
 
   LIB_DIR = File.expand_path("../lib", __dir__)
@@ -260,6 +341,96 @@ class AgentLoopTest < Minitest::Test
       Process.kill("INT", pid)
       assert_exit_within(pid)
       err_r.close
+    end
+  ensure
+    terminate_leftover(err_r, pid) if defined?(err_r) && err_r && defined?(pid) && pid
+  end
+
+  # Whether the monotonic deadline has passed (used by the wait helpers
+  # below).
+  def overdue?(deadline)
+    Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+  end
+
+  # Waits for the fake pi to write its readiness file (it does so right
+  # before the final sleep, when the event stream is already written).
+  # Returns the child pid — pausing only a fully-booted pi makes the
+  # quit-while-paused test deterministic (no SIGSTOP during the
+  # exec/bootstrap window).
+  def wait_for_ready(ready_file, timeout: 10)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+    loop do
+      return File.read(ready_file).to_i if File.exist?(ready_file)
+
+      flunk "fake pi did not become ready within #{timeout}s" if overdue?(deadline)
+      sleep 0.01
+    end
+  end
+
+  # Whether the process is currently stopped (Linux: the 'T' state in
+  # /proc/<pid>/status). The pi runs as a grandchild of this test process
+  # (letsdo spawns it), so it cannot be waited on directly — the state
+  # file is the observable.
+  def stopped?(pid)
+    status = File.read("/proc/#{pid}/status")
+    status.match?(/^State:\s+T\b/)
+  rescue Errno::ENOENT, Errno::EACCES
+    false
+  end
+
+  # Waits for the child to enter the stopped state (SIGSTOP delivered).
+  # Hang-guarded by a deadline.
+  def wait_stopped(pid, timeout: 5)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+    until stopped?(pid)
+      flunk "pi (pid #{pid}) did not stop within #{timeout}s" if overdue?(deadline)
+      sleep 0.01
+    end
+  end
+
+  # SIGHUP (terminal closed) must take the same clean stop path as
+  # SIGINT/SIGTERM, even mid-run: pi terminated, 'letsdo: stopped', exit 0.
+  def test_sighup_stops_the_loop_like_other_signals
+    with_project("developer" => "You are a developer.") do |root|
+      pid, err_r = spawn_letsdo(root, env: {
+                                  "FAKE_BACKLOG_SCENARIO" => "open", "FAKE_BACKLOG_COUNT" => "1",
+                                  "FAKE_PI_SLEEP" => "300"
+                                })
+      stderr = read_stderr_until(err_r, "letsdo: running developer for TASK-1")
+      Process.kill("HUP", pid)
+      assert_exit_within(pid)
+      stderr = drain_stderr(err_r, stderr)
+      err_r.close
+      assert_includes stderr, "letsdo: stopped"
+    end
+  ensure
+    terminate_leftover(err_r, pid) if defined?(err_r) && err_r && defined?(pid) && pid
+  end
+
+  # Quit-while-paused: after SIGSTOPping the pi group mid-run (equivalent
+  # to the TUI's 'p'), SIGTERM must stop the loop promptly — well under
+  # the 3s grace — thanks to CONT-before-TERM in PiRunner#terminate.
+  def test_sigterm_stops_a_paused_pi_promptly
+    with_project("developer" => "You are a developer.") do |root|
+      ready_file = File.join(Dir.mktmpdir("letsdo-ready"), "ready")
+      pid, err_r = spawn_letsdo(root, env: {
+                                  "FAKE_BACKLOG_SCENARIO" => "open", "FAKE_BACKLOG_COUNT" => "1",
+                                  "FAKE_PI_SLEEP" => "300", "FAKE_PI_READY_FILE" => ready_file
+                                })
+      stderr = read_stderr_until(err_r, "letsdo: running developer for TASK-1")
+      pi_pid = wait_for_ready(ready_file)
+      Process.kill("STOP", -pi_pid) # the frozen group ('p' in the TUI)
+      wait_stopped(pi_pid)
+
+      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      Process.kill("TERM", pid)
+      assert_exit_within(pid, timeout: 8)
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+      assert_operator elapsed, :<, 3.0,
+                      "stop while paused took #{elapsed.round(2)}s (CONT-before-TERM)"
+      stderr = drain_stderr(err_r, stderr)
+      err_r.close
+      assert_includes stderr, "letsdo: stopped"
     end
   ensure
     terminate_leftover(err_r, pid) if defined?(err_r) && err_r && defined?(pid) && pid

@@ -41,6 +41,34 @@ class TuiSessionTest < Minitest::Test
     session.run(&work)
   end
 
+  # A stub standing in for Letsdo::PiRunner: records pause/resume.
+  class FakeRunner
+    attr_reader :calls
+
+    def initialize
+      @calls = []
+    end
+
+    def pause
+      @calls << :pause
+    end
+
+    def resume
+      @calls << :resume
+    end
+  end
+
+  # Runs a session with the real pause wiring (gate + runner) injected.
+  def run_session_controlled(keys, gate:, runner:, &work)
+    session = Letsdo::Tui::Session.new(
+      name: "developer", handle: "@developer", log: @log, metrics: @metrics,
+      terminal: terminal, input: input_for(keys),
+      wait_seconds: 10, clock: -> { @clock },
+      pause_gate: gate, runner: -> { runner }
+    )
+    session.run(&work)
+  end
+
   # The rendered frames (terminal writes between the HOME prefixes).
   # Leave-screen bytes are appended after the last frame, so they are
   # stripped first; otherwise split(HOME) would drop that last frame.
@@ -85,6 +113,73 @@ class TuiSessionTest < Minitest::Test
 
     refute_includes frames.first, "PAUSED"
     assert_includes frames.last, "PAUSED"
+  end
+
+  # --- real pause semantics (TASK-74) ----------------------------------
+
+  def test_pause_mid_run_suspends_the_runner_and_the_gate
+    gate = Letsdo::Control::PauseGate.new
+    runner = FakeRunner.new
+    @metrics.run_started("TASK-74") # a run is active — runner exists
+
+    run_session_controlled("pq", gate: gate, runner: runner) { sleep 0.5; 0 }
+
+    assert_equal [:pause], runner.calls, "mid-run 'p' must SIGSTOP the runner"
+    assert gate.paused?, "mid-run 'p' must hold the gate too"
+    assert_includes frames.last, "PAUSED"
+  end
+
+  def test_second_pause_resumes_runner_and_gate
+    gate = Letsdo::Control::PauseGate.new
+    runner = FakeRunner.new
+    @metrics.run_started("TASK-74")
+
+    run_session_controlled("ppq", gate: gate, runner: runner) { sleep 0.5; 0 }
+
+    assert_equal [:pause, :resume], runner.calls
+    refute gate.paused?
+  end
+
+  def test_pause_between_runs_toggles_only_the_gate
+    gate = Letsdo::Control::PauseGate.new
+    # No run started — the runner accessor returns nil (absent runner).
+    run_session_controlled("pq", gate: gate, runner: nil) { sleep 0.5; 0 }
+
+    assert gate.paused?, "waiting-state 'p' must hold the gate"
+    assert_includes frames.last, "PAUSED"
+
+    run_session_controlled("ppq", gate: gate, runner: nil) { sleep 0.5; 0 }
+    refute gate.paused?, "second 'p' must release the gate"
+  end
+
+  def test_pause_without_gate_or_runner_stays_display_only
+    # No gate, no runner (unit contexts): 'p' is the TASK-42 display
+    # freeze only — and must not crash.
+    run_session("pq") { sleep 0.5; 0 }
+
+    assert_includes frames.last, "PAUSED"
+  end
+
+  def test_footer_shows_pause_vs_resume_by_state
+    run_session("p q".delete(" ")) { sleep 0.3; 0 }
+
+    refute_includes frames.first, "p resume"
+    assert_includes frames.first, "p pause"
+    assert_includes frames.last, "p resume"
+    refute_includes frames.last, "p pause"
+  end
+
+  def test_quit_while_paused_restores_the_terminal_and_exits_zero
+    gate = Letsdo::Control::PauseGate.new
+    runner = FakeRunner.new
+    @metrics.run_started("TASK-74")
+
+    result = run_session_controlled("pq", gate: gate, runner: runner) { sleep 0.5; :not_reached }
+
+    assert_equal 0, result
+    assert_equal [:pause], runner.calls
+    assert_includes @terminal_io.string, ENTER_ALT
+    assert_includes @terminal_io.string, LEAVE_ALT
   end
 
   def test_scroll_up_leaves_follow_mode

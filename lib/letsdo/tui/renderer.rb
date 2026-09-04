@@ -17,7 +17,7 @@ module Letsdo
     #   done 3 · left 2 · task TASK-42 · 00:03:21
     #   ├────────────────────────────────────────────────────────────┤
     #   <body_height scrollable log lines, newest at the bottom>
-    #   ↑/↓ PgUp/PgDn scroll · p pause · r refresh · q quit
+    #   ↑/↓ PgUp/PgDn scroll · p pause/resume · r refresh · q quit
     module Renderer
       HEADER_HEIGHT = 2
       FOOTER_HEIGHT = 1
@@ -44,7 +44,7 @@ module Letsdo
         frame << state_line(metrics, width, paused, wait_seconds)
         frame << divider_line(width)
         body_lines(lines, offset, body_height, width).each { |line| frame << line }
-        frame << footer_line(width)
+        frame << footer_line(width, paused)
         frame.join("\n")
       end
 
@@ -98,8 +98,12 @@ module Letsdo
         "├#{body}┤"
       end
 
-      def self.footer_line(width)
-        fit_line("↑/↓ PgUp/PgDn scroll · p pause · r refresh · q quit", width)
+      # The key-help footer. The 'p' hint mirrors the toggle state:
+      # 'p pause' when the run is active, 'p resume' when it is suspended
+      # (the display is frozen, PAUSED in the header).
+      def self.footer_line(width, paused)
+        hint = paused ? "p resume" : "p pause"
+        fit_line("↑/↓ PgUp/PgDn scroll · #{hint} · r refresh · q quit", width)
       end
 
       # "no open tasks, retrying in 10s" style reason for the waiting state.

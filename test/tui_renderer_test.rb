@@ -38,6 +38,13 @@ class TuiRendererTest < Minitest::Test
     assert_includes frame.lines[-1], "↑/↓ PgUp/PgDn scroll · p pause · r refresh · q quit"
   end
 
+  def test_footer_hint_flips_to_resume_when_paused
+    frame = render(paused: true)
+
+    assert_includes frame.lines[-1], "p resume"
+    refute_includes frame.lines[-1], "p pause"
+  end
+
   def test_running_state_line_shows_metrics
     frame = render(left: 2, current_task: "TASK-42", current_task_seconds: 201.0)
 

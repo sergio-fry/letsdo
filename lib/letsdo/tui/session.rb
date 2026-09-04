@@ -19,13 +19,19 @@ module Letsdo
     # Interactive actions (footer lists them):
     #   ↑ / ↓ / PgUp / PgDn / Home / End — scroll; the view auto-follows
     #     the newest line while at the bottom (tail -f semantics);
-    #   p — pause/resume: display freeze (PAUSED in the header, the log
-    #     keeps buffering, the view stays); keys still repaint;
+    #   p — pause/resume with REAL suspension (TASK-67): while a run is
+    #     active the pi group is frozen with SIGSTOP (runner.pause) and
+    #     the display freezes (PAUSED in the header, the log keeps
+    #     buffering, the view stays); between runs the shared
+    #     Control::PauseGate is toggled so the loop starts no new run.
+    #     Keys still repaint; the footer hint flips between 'p pause'
+    #     and 'p resume';
     #   r — immediate backlog re-query for the 'left' metric;
     #   q / Ctrl-C — quit: exactly the signal-stop unwinding — Letsdo::Stopped
     #     raised into the main thread terminates the pi child (PiRunner
-    #     rescue), stops the loop (AgentLoop rescue) and restores the
-    #     terminal from the ensure block; exit code 0.
+    #     rescue, CONT-before-TERM so a paused run is still killable), stops
+    #     the loop (AgentLoop rescue) and restores the terminal from the
+    #     ensure block; exit code 0.
     #
     # Signals: SIGWINCH sets a flag → the input thread re-queries the size
     # and repaints (no corruption). SIGINT/SIGTERM keep working through the
@@ -50,8 +56,15 @@ module Letsdo
       #        re-query
       # @param wait_seconds [Numeric] retry interval for the waiting state
       # @param clock [Proc] monotonic clock for tick timing (injectable)
+      # @param pause_gate [Letsdo::Control::PauseGate, nil] the shared
+      #        between-runs pause flag: 'p' toggles it; nil (unit contexts)
+      #        keeps 'p' display-freeze-only
+      # @param runner [Proc, nil] callable → the current agent runner
+      #        (Letsdo::PiRunner); 'p' suspends/resumes it (SIGSTOP/SIGCONT)
+      #        when a run is active, a no-op otherwise
       def initialize(name:, handle:, log:, metrics:, terminal:, input:,
-                     refresh: nil, wait_seconds: 10.0, clock: nil)
+                     refresh: nil, wait_seconds: 10.0, clock: nil,
+                     pause_gate: nil, runner: nil)
         @name = name
         @handle = handle
         @log = log
@@ -61,6 +74,8 @@ module Letsdo
         @refresh = refresh
         @wait_seconds = wait_seconds
         @clock = clock || -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }
+        @pause_gate = pause_gate
+        @runner = runner
         @offset = 0
         @follow = true
         @paused = false
@@ -142,7 +157,7 @@ module Letsdo
           @follow = true
           true
         when :p
-          @paused = !@paused
+          toggle_pause
           true
         when :r
           refresh
@@ -164,13 +179,35 @@ module Letsdo
         @metrics.provider_result(@refresh.call)
       end
 
+      # Pause/resume with real suspension (TASK-67): mid-run (metrics
+      # current_task distinguishes the running state) the pi group is
+      # frozen with SIGSTOP via the agent runner; between runs the shared
+      # PauseGate blocks the loop from starting the next task. The gate is
+      # set FIRST so no new run can sneak in between the flag and the
+      # runner pause; the runner call is a no-op when no run is active
+      # (nil runner or a finished one re-pausing nothing). The display
+      # freezes in both cases (PAUSED badge), the log keeps buffering.
+      def toggle_pause
+        @paused = !@paused
+        if @paused
+          @pause_gate&.pause
+          @runner&.call&.pause
+        else
+          @pause_gate&.resume
+          @runner&.call&.resume
+        end
+      end
+
       # Quit = the same unwinding as a stop signal: Letsdo::Stopped raised
       # into the main thread (inside the orchestrator work) terminates the
       # pi child and stops the loop; the ensure block restores the
-      # terminal. No-op after teardown already started.
+      # terminal. No-op after teardown already started. The stop flag is
+      # set BEFORE the raise so the input thread breaks its loop right away
+      # and renders no frames during the unwind (TASK-67 CONTROL MODEL).
       def quit
         return if @stop
 
+        @stop = true
         Thread.main.raise(Letsdo::Stopped)
       end
 

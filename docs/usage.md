@@ -121,10 +121,10 @@ plain line stream:
   letsdo: stopped
   ```
 
-Stop the loop with `Ctrl+C` (`SIGINT`; `SIGTERM` works too) — a running pi
-child is terminated and the process exits with code 0. With
-`LETSDO_DEBUG=1` the loop additionally traces `[letsdo] loop: ...` decisions
-to stderr.
+Stop the loop with `Ctrl+C` (`SIGINT`; `SIGTERM` and `SIGHUP` — terminal
+closed — work too) — a running pi child is terminated and the process
+exits with code 0. With `LETSDO_DEBUG=1` the loop additionally traces
+`[letsdo] loop: ...` decisions to stderr.
 
 ## The interactive TUI
 
@@ -137,7 +137,7 @@ done 3 · left 2 · task TASK-42 · 00:03:21
 ├──────────────────────────────────────────────────────────┤
 …scrollable combined log: agent text, tool lines and loop
  service messages in arrival order, newest at the bottom…
-↑/↓ PgUp/PgDn scroll · p pause · r refresh · q quit
+↑/↓ PgUp/PgDn scroll · p pause · r refresh · q quit   (p resume while paused)
 ```
 
 - **Header** — agent identity (`letsdo · <name> (@handle)`) and the session
@@ -145,11 +145,14 @@ done 3 · left 2 · task TASK-42 · 00:03:21
 - **State line** — tasks done in this session, tasks left (from the latest
   backlog query), and either the running task with its elapsed time, a
   waiting reason (`no open tasks (retry in 10s)` / `backlog unavailable
-  (retry in 10s)`), or `PAUSED` while the display is frozen.
+  (retry in 10s)`), or `PAUSED` while the agent is suspended.
 - **Stream** — one combined log of everything the agent produces: answer
   text deltas, tool lines and loop messages, exactly as OutputStreamer
   emits them. The view follows the newest line automatically (tail -f).
-- **Footer** — the key map.
+  While paused the frame freezes but the log keeps buffering, so nothing
+  is lost.
+- **Footer** — the key map; the `p` hint says `p pause` while the agent
+  runs and `p resume` while it is suspended.
 
 Keys:
 
@@ -158,7 +161,7 @@ Keys:
 | `↑` / `↓` | scroll one line (scrolling up leaves auto-follow) |
 | `PgUp` / `PgDn` | scroll one page |
 | `Home` / `End` | jump to top / back to the newest line (auto-follow) |
-| `p` | pause/resume the display: the frame freezes, `PAUSED` is shown, the log keeps buffering; keys still repaint |
+| `p` | pause/resume the agent: mid-run the running pi is suspended at the kernel level (SIGSTOP — model generation and tool executions freeze, the frame shows `PAUSED`, the log keeps buffering); between runs the next task is held until resume. A second `p` resumes (SIGCONT). The footer flips between `p pause` and `p resume` |
 | `r` | immediate backlog re-query (updates the "left" counter) |
 | `q` | quit — identical to a stop signal: the pi child is terminated, the terminal is restored, exit code 0 |
 | `Ctrl+C` | same as `q` inside the TUI |
@@ -182,13 +185,18 @@ is what keeps CI and pipes deterministic.
 4. **Wait** — when no tasks are open (or the backlog is unreadable), wait
    the retry interval (10 s by default, see `LETSDO_WAIT_SECONDS`) and
    query again. An unreadable backlog pauses instead of crashing.
-5. **Stop** — `Ctrl+C` / `SIGTERM` (or `q` in the TUI) stops the loop
-   immediately: the running pi child is terminated, the terminal is
-   restored, exit code 0.
+5. **Stop** — `Ctrl+C` / `SIGTERM` / `SIGHUP` (or `q` in the TUI) stops the
+   loop immediately: the running pi child is terminated (even when it was
+   paused — SIGCONT comes before SIGTERM), the terminal is restored, exit
+   code 0.
 
 The waiting is interruptible — a stop signal unwinds the loop right away
 instead of waiting out the retry interval. A non-zero agent exit code is
 reported but does not stop the loop.
+
+Pause (`p` in the TUI) between runs sets a gate the loop polls before
+starting the next run: while paused, no new task is started even when the
+backlog has open ones; resume lets the queued task run.
 
 ## Running several agents
 

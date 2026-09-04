@@ -335,4 +335,24 @@ class CliTest < Minitest::Test
     assert_equal "Hello, world!\n", tty_out.string
     refute_includes tty_out.string, "\e[?1049h"
   end
+
+  # Pause-then-quit in the TUI: 'p' engages the shared PauseGate and the
+  # runner (SIGSTOP when a run is active, gate-only otherwise), 'q' quits
+  # the same way a stop signal does. Both orders must terminate the pi,
+  # restore the terminal and exit 0.
+  def test_tui_pause_then_quit_terminates_the_pi_cleanly
+    tty_out = FakeTtyOut.new
+    code = with_project("developer" => "You are a developer.") do |root|
+      Letsdo::CLI.run(["developer"],
+                      env: fake_backlog_env(count: 1).merge(
+                        "LETSDO_ROOT" => root, "TERM" => "xterm-256color",
+                        "LETSDO_PI_COMMAND" => fake_pi, "FAKE_PI_SLEEP" => "300"
+                      ),
+                      stdout: tty_out, stderr: @err, stdin: FakeTtyIn.new("pq"))
+    end
+
+    assert_equal 0, code
+    assert_includes tty_out.string, "\e[?1049h" # alternate screen entered
+    assert_includes tty_out.string, "\e[?1049l" # ... and restored
+  end
 end
