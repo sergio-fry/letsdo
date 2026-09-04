@@ -19,6 +19,7 @@ platform — the backlog folder is the single source of truth.
 - [Getting started](#getting-started)
 - [Configuration](#configuration)
 - [How it works](#how-it-works)
+- [Guides](#guides)
 - [Development](#development)
 - [Alternatives](#alternatives)
 - [Contributing](#contributing)
@@ -142,6 +143,9 @@ The agent still runs — on the built-in default prompt. The notification is
 printed once per process. The looked-up path is exactly
 `<LETSDO_ROOT>/agents/<name>.md`.
 
+For the full walkthrough — install, session anatomy (plain and TUI), the
+loop/waiting model, exit codes — see the [usage guide](docs/usage.md).
+
 CLI reference:
 
 ```
@@ -173,6 +177,10 @@ All knobs are environment variables:
 | `AGENT_WAIT_SECONDS` | — | Fallback for `LETSDO_WAIT_SECONDS` (`bin/agent-loop` compatibility). |
 | `LETSDO_BACKLOG_COMMAND` | `backlog` | The Backlog.md CLI command used as the task provider. |
 | `LETSDO_DEBUG` | — | Set to `1` to trace loop decisions on stderr. |
+
+The comprehensive reference — every variable with defaults, precedences,
+examples and where each one is read — lives in the
+[configuration reference](docs/config.md).
 
 ## How it works
 
@@ -210,6 +218,15 @@ Multiple agents run as separate processes, each with its own loop and its
 own assignee; they coordinate through the shared backlog — nothing else in
 common. This repository itself is run by letsdo: `agents/developer.md` and
 `agents/analyst.md` are its own workers on the `backlog/` tasks.
+
+## Guides
+
+- [Usage guide](docs/usage.md) — install, first run, loop semantics,
+  the interactive TUI and its keys, exit codes.
+- [Prompt-authoring guide](docs/prompts.md) — what makes a good agent
+  prompt: must-haves, anti-patterns, worked examples.
+- [Configuration reference](docs/config.md) — every environment variable,
+  its default, precedence and where it is read.
 
 ## Development
 
