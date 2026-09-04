@@ -38,7 +38,7 @@ class PiRunnerTest < Minitest::Test
   end
 end
 
-# Event-stream behaviour: argv, exit codes, text, tools, truncation.
+# Event-stream behaviour: argv, exit codes, text, tools.
 class PiRunnerStreamTest < PiRunnerTest
   def test_runs_pi_with_mode_json_flags_and_prompt_in_argv
     with_argv_capture do |path|
@@ -90,27 +90,30 @@ class PiRunnerStreamTest < PiRunnerTest
     assert_match(/\n\d{2}:\d{2}:\d{2} ✓ bash: done \(\d+(\.\d+)?s\)\n\z/, @err.string)
   end
 
-  def test_tool_result_goes_to_stderr
+  def test_tool_result_body_is_not_printed
     run_pi(prompt: 'You are an agent')
 
-    assert_includes @err.string, '  total 8'
-    assert_includes @err.string, '  drwxr-xr-x  root root'
+    refute_includes @err.string, '  total 8'
+    refute_includes @err.string, '  drwxr-xr-x  root root'
     refute_includes @err.string, '✖ Error:'
+    assert_includes @err.string, '✓ bash: done'
   end
 
-  def test_tool_error_is_marked
+  def test_tool_error_shows_error_completion_only
     run_pi(prompt: 'You are an agent', scenario: 'error')
 
     assert_includes @err.string, '⚙ bash: ls /nonexistent'
-    assert_includes @err.string, '✖ Error:'
-    assert_includes @err.string, 'Command exited with code 2'
+    assert_includes @err.string, '✖ bash: error'
+    refute_includes @err.string, '✖ Error:'
+    refute_includes @err.string, 'Command exited with code 2'
   end
 
-  def test_big_tool_result_is_truncated_with_note
+  def test_big_tool_result_body_is_not_printed
     run_pi(prompt: 'You are an agent', scenario: 'big')
 
-    assert_includes @err.string, '… [output truncated:'
-    assert_includes @err.string, '  line 001: xyz'
+    refute_includes @err.string, '… [output truncated:'
+    refute_includes @err.string, '  line 001: xyz'
+    assert_includes @err.string, '✓ bash: done'
   end
 
   def test_toolcall_start_without_execution_falls_back_to_name_only

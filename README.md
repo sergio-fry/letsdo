@@ -70,9 +70,9 @@ generation, any repeatable task flow you can express as assignee + prompt.
   and stops instantly on `Ctrl+C`.
 - **Streaming output** — agent text streams to stdout as it is generated;
   service and tool lines go to stderr with a shared `HH:MM:SS` prefix:
-  tool start (`⚙ name: args`), completion with duration
-  (`✓/✖ name: … (3s)`), indented results (trimmed with a summary note
-  when large), and error results marked (`✖ Error: ...`).
+  tool start (`⚙ name: args`) and completion with duration
+  (`✓/✖ name: done/error (3s)`). Tool result bodies are not printed, so
+  the stream stays readable while the agent works.
 - **`--version` / `--help`** — `Letsdo::VERSION` and usage, exit 0.
 - **Available as a library** — `require "letsdo"` exposes the
   `Letsdo` module (`Letsdo::VERSION`, `Letsdo::PromptStore`, `Letsdo::Agent`,

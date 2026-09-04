@@ -5,8 +5,6 @@ require 'json'
 module Letsdo
   # Routes pi output: agent text on stdout, tool lines on stderr (or a log).
   class OutputStreamer
-    MAX_RESULT_LINES = 100
-    MAX_RESULT_CHARS = 4_000
     MAX_ARGS_CHARS = 300
 
     def initialize(stdout: $stdout, stderr: $stderr, log: nil, clock: nil)
@@ -34,8 +32,8 @@ module Letsdo
       write_service("#{line}\n")
     end
 
-    def tool_result(name, text, error: false)
-      write_service(ResultBlock.call(text, error: error, completion: completion_line(name, error)))
+    def tool_result(name, error: false)
+      write_service(completion_line(name, error))
     end
 
     def finish
@@ -85,4 +83,3 @@ module Letsdo
 end
 
 require_relative 'output_streamer/arg_summary'
-require_relative 'output_streamer/result_block'

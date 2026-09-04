@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Tool result bodies (indented stdout/stderr blocks, truncation notes,
+  `✖ Error:` markers) are no longer printed to the aux output; the stream
+  shows only tool invocations (`HH:MM:SS ⚙ name: args`) and a one-line
+  completion with duration (`✓/✖ name: done/error (Ns)`).
 - `Session#quit` sets the stop flag before raising `Letsdo::Stopped`, so
   the input thread renders no frames during teardown.
 

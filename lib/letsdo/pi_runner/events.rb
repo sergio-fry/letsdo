@@ -57,34 +57,8 @@ module Letsdo
 
     def handle_tool_execution_end(event)
       name = event['toolName'] || 'tool'
-      text = result_text(event['result'])
       error = event['isError'] == true
-      text = 'tool failed with an error' if text_missing?(text) && error
-      @streamer.tool_result(name, text, error: error)
-    end
-
-    def text_missing?(text)
-      text.nil? || text.empty?
-    end
-
-    def result_text(result)
-      return nil unless result.is_a?(Hash)
-
-      content = result['content']
-      return nil unless content.is_a?(Array)
-
-      joined = content.filter_map { |block| text_block(block) }.join
-      joined.empty? ? nil : joined
-    end
-
-    def text_block(block)
-      return nil unless block.is_a?(Hash)
-
-      text = block['text']
-      return nil unless text.is_a?(String) && !text.empty?
-      return nil unless block['type'] == 'text' || !block.key?('type')
-
-      text
+      @streamer.tool_result(name, error: error)
     end
 
     def flush_pending_tools

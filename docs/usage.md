@@ -104,12 +104,12 @@ plain line stream:
 
   ```
   HH:MM:SS ⚙ tool_name: arguments     tool call (bash → the command, read/write/edit → the path)
-    indented lines                    tool result, no time prefix (data, not actions)
-    … [output truncated: N lines, M]  big results are trimmed with a summary note
   HH:MM:SS ✓ tool_name: done (3s)     tool completion, success
   HH:MM:SS ✖ tool_name: error (3s)    tool completion, error
-  ✖ Error: ...                        error result marked explicitly
   ```
+
+  Tool result bodies are never printed — the call line and its one-line
+  completion are the whole tool story, so the stream stays readable.
 
 - Loop service messages on stderr, e.g.:
 
