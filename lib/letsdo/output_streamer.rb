@@ -33,11 +33,17 @@ module Letsdo
 
     # @param stdout [IO] stream for the agent's answer text
     # @param stderr [IO] stream for service lines
+    # @param log [Object, nil] an alternate log target (TUI mode): when
+    #        given, ALL output — answer text and service tool lines — is
+    #        written there as one combined stream (a
+    #        Letsdo::Tui::LogBuffer); without it the plain stdout/stderr
+    #        split is byte-identical to before
     # @param clock [Proc] callable → Time, the source of time for prefixes
     #        (injected in tests for deterministic HH:MM:SS)
-    def initialize(stdout: $stdout, stderr: $stderr, clock: nil)
+    def initialize(stdout: $stdout, stderr: $stderr, log: nil, clock: nil)
       @stdout = stdout
       @stderr = stderr
+      @log = log
       @clock = clock || -> { Time.now }
       @last_char = nil
       @action_started_at = nil
@@ -49,8 +55,8 @@ module Letsdo
     def text_delta(delta)
       return if delta.nil? || delta.empty?
 
-      @stdout.write(delta)
-      @stdout.flush
+      text_sink.write(delta)
+      text_sink.flush unless @log
       @last_char = delta[-1]
     end
 
@@ -102,8 +108,8 @@ module Letsdo
     def finish
       return unless @last_char && @last_char != "\n"
 
-      @stdout.write("\n")
-      @stdout.flush
+      text_sink.write("\n")
+      text_sink.flush unless @log
     end
 
     private
@@ -256,10 +262,21 @@ module Letsdo
     end
 
     # Writes a service line to stderr and flushes immediately so output
-    # appears as it is produced.
+    # appears as it is produced; in TUI mode the line goes to the shared
+    # log buffer instead.
     def write_service(text)
-      @stderr.write(text)
-      @stderr.flush
+      if @log
+        @log.write(text)
+      else
+        @stderr.write(text)
+        @stderr.flush
+      end
+    end
+
+    # Where the agent's answer text goes: the shared log in TUI mode,
+    # stdout otherwise.
+    def text_sink
+      @log || @stdout
     end
   end
 end

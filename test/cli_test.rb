@@ -210,4 +210,129 @@ class CliTest < Minitest::Test
     assert_equal 1, code
     assert_includes @err.string, "Unknown agent: nosuch"
   end
+
+  # --- TUI mode selection (TASK-42) -------------------------------------
+
+  # A fake terminal stream: reports tty? true, buffers writes like StringIO.
+  class FakeTtyOut
+    attr_reader :io
+
+    def initialize
+      @io = StringIO.new
+    end
+
+    def tty?
+      true
+    end
+
+    def write(text)
+      @io.write(text)
+    end
+
+    def puts(*args)
+      @io.puts(*args)
+    end
+
+    def flush
+      @io.flush
+    end
+
+    def string
+      @io.string
+    end
+  end
+
+  # A fake keyboard: reports tty? true and serves the scripted bytes.
+  class FakeTtyIn
+    def initialize(bytes)
+      @io = StringIO.new(bytes)
+    end
+
+    def tty?
+      true
+    end
+
+    def eof?
+      @io.eof?
+    end
+
+    def getc
+      @io.getc
+    end
+
+    def wait_readable(_timeout)
+      @io.eof? ? nil : true
+    end
+
+    def raw(&block)
+      block.call
+    end
+
+    def noecho(&block)
+      block.call
+    end
+  end
+
+  # The TUI is engaged only with a terminal stdout, a terminal stdin and
+  # TERM != dumb. The 'q' key quits the session the same way a stop signal
+  # does: pi child terminated, terminal restored, exit 0.
+  def test_tui_engages_with_real_terminals_and_quits_cleanly
+    tty_out = FakeTtyOut.new
+    code = with_project("developer" => "You are a developer.") do |root|
+      Letsdo::CLI.run(["developer"],
+                      env: fake_backlog_env(count: 2).merge("LETSDO_ROOT" => root,
+                                                            "TERM" => "xterm-256color",
+                                                            "LETSDO_PI_COMMAND" => fake_pi),
+                      stdout: tty_out, stderr: @err, stdin: FakeTtyIn.new("q"))
+    end
+
+    assert_equal 0, code
+    assert_includes tty_out.string, "\e[?1049h"   # alternate screen entered
+    assert_includes tty_out.string, "\e[?1049l"   # ... and restored
+    assert_includes tty_out.string, "letsdo · developer (@developer)"
+    assert_empty @err.string # service messages went to the TUI log, not stderr
+  end
+
+  def test_tui_not_engaged_when_stdout_is_not_a_tty
+    code = run_cli(["developer"], prompts: { "developer" => "You are a developer." },
+                   env: fake_backlog_env(count: 1).merge("TERM" => "xterm",
+                                                         "LETSDO_PI_COMMAND" => fake_pi),
+                   sleeper: stop_on_first_wait)
+
+    assert_equal 0, code
+    assert_equal "Hello, world!\n", @out.string
+    refute_includes @out.string, "\e[?1049h"
+  end
+
+  def test_tui_not_engaged_when_term_is_dumb
+    tty_out = FakeTtyOut.new
+    code = with_project("developer" => "You are a developer.") do |root|
+      Letsdo::CLI.run(["developer"],
+                      env: fake_backlog_env(count: 1).merge("LETSDO_ROOT" => root,
+                                                            "TERM" => "dumb",
+                                                            "LETSDO_PI_COMMAND" => fake_pi),
+                      stdout: tty_out, stderr: @err, stdin: FakeTtyIn.new("q"),
+                      sleeper: stop_on_first_wait)
+    end
+
+    assert_equal 0, code
+    assert_equal "Hello, world!\n", tty_out.string
+    refute_includes tty_out.string, "\e[?1049h"
+  end
+
+  def test_tui_not_engaged_when_stdin_is_not_a_tty
+    tty_out = FakeTtyOut.new
+    code = with_project("developer" => "You are a developer.") do |root|
+      Letsdo::CLI.run(["developer"],
+                      env: fake_backlog_env(count: 1).merge("LETSDO_ROOT" => root,
+                                                            "TERM" => "xterm",
+                                                            "LETSDO_PI_COMMAND" => fake_pi),
+                      stdout: tty_out, stderr: @err, stdin: StringIO.new("q"),
+                      sleeper: stop_on_first_wait)
+    end
+
+    assert_equal 0, code
+    assert_equal "Hello, world!\n", tty_out.string
+    refute_includes tty_out.string, "\e[?1049h"
+  end
 end

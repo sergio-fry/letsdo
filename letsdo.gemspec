@@ -18,6 +18,14 @@ Gem::Specification.new do |spec|
 
   spec.required_ruby_version = ">= 3.0"
 
+  # Runtime dependencies: the interactive TUI. Required lazily inside the
+  # tui classes so the plain line-stream mode (pipes/CI/tests) works with
+  # zero extra gems.
+  spec.add_runtime_dependency "tty-screen", "~> 0.8"
+  spec.add_runtime_dependency "tty-cursor", "~> 0.7"
+  spec.add_runtime_dependency "tty-reader", "~> 0.9"
+  spec.add_runtime_dependency "unicode-display_width", ">= 2.0"
+
   # RubyGems resolves executables relative to bindir: the literal value
   # "bin/letsdo" would make gem build look for bin/bin/letsdo. The canonical
   # form: bindir="bin" + executables=["letsdo"] — the gem executable file

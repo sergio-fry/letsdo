@@ -43,18 +43,20 @@ module Letsdo
     #        LETSDO_BACKLOG_COMMAND); injected in tests
     # @param stdout [IO] stream for normal output (usage, --help, list)
     # @param stderr [IO] stream for service output
+    # @param stdin [IO] keyboard stream (the TUI reads keys from it)
     # @param sleeper [Proc, nil] waiting procedure for the loop (callable
     #        with the interval); injected in tests for deterministic stops
     # @return [Integer] exit code: 0 — success (incl. loop stop), 1 — error,
     #         otherwise — pi exit code
-    def self.run(argv, env: ENV, stdout: $stdout, stderr: $stderr, sleeper: nil)
-      new(env: env, stdout: stdout, stderr: stderr, sleeper: sleeper).run(argv)
+    def self.run(argv, env: ENV, stdout: $stdout, stderr: $stderr, stdin: $stdin, sleeper: nil)
+      new(env: env, stdout: stdout, stderr: stderr, stdin: stdin, sleeper: sleeper).run(argv)
     end
 
-    def initialize(env:, stdout:, stderr:, sleeper: nil)
+    def initialize(env:, stdout:, stderr:, stdin: $stdin, sleeper: nil)
       @env = env
       @stdout = stdout
       @stderr = stderr
+      @stdin = stdin
       @sleeper = sleeper
       @root = env.fetch('LETSDO_ROOT', Dir.pwd)
     end
@@ -91,6 +93,20 @@ module Letsdo
       # fast (exit 1) instead of spinning in the loop.
       PromptStore.new(root: @root).read(name)
 
+      if tui?
+        run_agent_tui(name)
+      else
+        run_agent_plain(name)
+      end
+    rescue UnknownAgentError => e
+      @stderr.puts(e.message)
+      print_agents
+      1
+    end
+
+    # The non-interactive path: the plain line-stream output, byte-identical
+    # to the pre-TUI behavior (pipes, CI, tests, TERM=dumb).
+    def run_agent_plain(name)
       streamer = OutputStreamer.new(stdout: @stdout, stderr: @stderr)
       agent = Agent.new(name: name, root: @root, flags: parse_pi_flags, streamer: streamer,
                         command: pi_command)
@@ -101,10 +117,43 @@ module Letsdo
                            task_provider: -> { provider.call },
                            wait_seconds: wait_seconds, sleeper: @sleeper, stderr: @stderr)
       loop.run
-    rescue UnknownAgentError => e
-      @stderr.puts(e.message)
-      print_agents
-      1
+    end
+
+    # The interactive path: full-screen TUI over the same orchestrator loop.
+    # The streamer and the loop's service messages land in one combined log
+    # buffer; the loop driver feeds the header metrics facade; the session
+    # controller renders everything from a background input thread and
+    # restores the terminal on every exit path. The loop itself runs on the
+    # calling thread exactly as in plain mode.
+    def run_agent_tui(name)
+      clock = -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }
+      handle = assignee_handle(name)
+      log = Tui::LogBuffer.new
+      metrics = Tui::Metrics.new(name: name, handle: handle, clock: clock,
+                                 on_run_start: ->(_label) { log.divider })
+      terminal = Tui::Terminal.new(stream: @stdout)
+      input = Tui::Input.new(stdin: @stdin)
+      streamer = OutputStreamer.new(log: log)
+      agent = Agent.new(name: name, root: @root, flags: parse_pi_flags, streamer: streamer,
+                        command: pi_command)
+      provider = BacklogTasks.new(handle: handle, command: backlog_command, cwd: @root,
+                                  env: ENV.to_h.merge(@env))
+      loop = AgentLoop.new(name: name, handle: handle, agent: agent,
+                           task_provider: -> { provider.call },
+                           wait_seconds: wait_seconds, sleeper: @sleeper, stderr: log,
+                           metrics: metrics)
+      session = Tui::Session.new(name: name, handle: handle, log: log, metrics: metrics,
+                                 terminal: terminal, input: input,
+                                 refresh: -> { provider.call },
+                                 wait_seconds: wait_seconds, clock: clock)
+      session.run { loop.run }
+    end
+
+    # The TUI is engaged only when stdout and stdin are terminals and TERM
+    # is not dumb; otherwise the plain line-stream output (pipes, CI,
+    # tests) — no escape codes, no TUI.
+    def tui?
+      @stdout.tty? && @stdin.tty? && @env['TERM'].to_s != 'dumb'
     end
 
     # The agent's assignee handle: AGENT_ASSIGNEE_HANDLE override, otherwise

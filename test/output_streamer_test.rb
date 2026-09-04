@@ -194,4 +194,37 @@ class OutputStreamerTest < Minitest::Test
 
     assert_empty @out.string
   end
+
+  # --- TUI mode: everything goes to the injected log target (TASK-42) ---
+
+  def test_log_target_receives_text_and_tool_lines_in_order
+    log = Letsdo::Tui::LogBuffer.new
+    streamer = Letsdo::OutputStreamer.new(log: log, clock: -> { @now })
+
+    streamer.text_delta("Hello ")
+    streamer.tool_start("bash", args: { "command" => "echo hi" })
+    streamer.tool_result("bash", "hi\n")
+    streamer.text_delta("world")
+    streamer.finish
+
+    lines, = log.lines
+    combined = lines.join("\n")
+    assert_includes combined, "Hello "
+    assert_includes combined, "world"
+    assert_includes combined, "14:05:03 ⚙ bash: echo hi"
+    assert_includes combined, "14:05:03 ✓ bash: done"
+    assert_match(/Hello .*world/m, combined)
+    assert_empty @out.string
+    assert_empty @err.string
+  end
+
+  def test_log_target_keeps_the_final_newline_contract
+    log = Letsdo::Tui::LogBuffer.new
+    streamer = Letsdo::OutputStreamer.new(log: log, clock: -> { @now })
+
+    streamer.text_delta("no trailing newline")
+    streamer.finish
+
+    assert_equal ["no trailing newline"], log.lines.first
+  end
 end

@@ -35,9 +35,14 @@ module Letsdo
     # @param sleeper [Proc, nil] callable(Float) → waiting; injectable for
     #        deterministic stops in tests (throw Letsdo::AgentLoop::STOP)
     # @param stderr [IO] service output stream
+    # @param metrics [Object, nil] optional header-metrics facade
+    #        (Letsdo::Tui::Metrics in TUI mode): receives provider_result
+    #        on every provider call and run_started/run_finished around
+    #        each agent run; nil in plain mode, so plain behavior is
+    #        byte-identical
     # @param debug [Boolean, nil] trace [letsdo] lines to stderr; nil = LETSDO_DEBUG
     def initialize(name:, handle:, agent: nil, run_one: nil, task_provider:,
-                   wait_seconds: 10.0, sleeper: nil, stderr: $stderr, debug: nil)
+                   wait_seconds: 10.0, sleeper: nil, stderr: $stderr, metrics: nil, debug: nil)
       @name = name
       @handle = handle
       @agent = agent
@@ -45,6 +50,7 @@ module Letsdo
       @task_provider = task_provider
       @wait_seconds = wait_seconds
       @stderr = stderr
+      @metrics = metrics
       @debug = debug.nil? ? ENV["LETSDO_DEBUG"] == "1" : debug
       @sleeper = sleeper || ->(seconds) { sleep(seconds) }
     end
@@ -105,6 +111,7 @@ module Letsdo
     def wrapped_provider
       lambda do
         tasks = @task_provider.call
+        @metrics&.provider_result(tasks.nil? ? nil : tasks.length)
         if tasks.nil?
           debug("provider: backlog unavailable")
           @stderr.puts("letsdo: backlog unavailable, retrying in #{@wait_seconds}s")
@@ -120,14 +127,18 @@ module Letsdo
     end
 
     # One agent run per task; a non-zero exit code is noted but the loop
-    # continues.
+    # continues. Metrics events bracket the run so the TUI can count done
+    # tasks and show the running one with its elapsed time.
     def wrapped_run
       lambda do |task|
+        @metrics&.run_started(task_label(task))
         @stderr.puts("letsdo: running #{@name} for #{task_label(task)}")
         debug("running agent for task #{task_label(task)}")
         code = @run_one.call(task)
         debug("agent run exit #{code}")
         @stderr.puts("letsdo: #{@name} exited with code #{code}") if code != 0
+      ensure
+        @metrics&.run_finished
       end
     end
 

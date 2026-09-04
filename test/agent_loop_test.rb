@@ -95,6 +95,56 @@ class AgentLoopTest < Minitest::Test
     assert_includes stderr.string, "letsdo: running developer for plain-task"
   end
 
+  # --- TUI metrics facade events (TASK-42) ------------------------------
+
+  # A recorder standing in for Letsdo::Tui::Metrics.
+  class MetricsRecorder
+    attr_reader :events
+
+    def initialize
+      @events = []
+    end
+
+    def provider_result(count)
+      @events << [:provider, count]
+    end
+
+    def run_started(task)
+      @events << [:start, task]
+    end
+
+    def run_finished
+      @events << [:finish]
+    end
+  end
+
+  def make_loop_with_metrics(provider:, metrics:, run_one: nil)
+    stderr = StringIO.new
+    Letsdo::AgentLoop.new(
+      name: "developer", handle: "@developer", metrics: metrics,
+      run_one: run_one || ->(_task) { 0 }, task_provider: provider,
+      wait_seconds: 0.5, sleeper: ->(_s) { throw Letsdo::AgentLoop::STOP }, stderr: stderr
+    )
+  end
+
+  def test_metrics_receives_provider_counts_and_run_events
+    metrics = MetricsRecorder.new
+    provider = once_provider([{ "id" => "TASK-1" }])
+
+    make_loop_with_metrics(provider: provider, metrics: metrics).run
+
+    assert_equal [[:provider, 1], [:start, "TASK-1"], [:finish], [:provider, 0]],
+                 metrics.events
+  end
+
+  def test_metrics_receives_nil_when_the_backlog_is_unreadable
+    metrics = MetricsRecorder.new
+
+    make_loop_with_metrics(provider: -> { nil }, metrics: metrics).run
+
+    assert_equal [[:provider, nil]], metrics.events
+  end
+
   # --- signal handling (real process, real signals) ----------------------
 
   LIB_DIR = File.expand_path("../lib", __dir__)
