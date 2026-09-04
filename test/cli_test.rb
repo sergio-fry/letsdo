@@ -92,7 +92,9 @@ class CliTest < Minitest::Test
   end
 
   def unique_done_file
-    File.join(Dir.tmpdir, "fake_backlog_done_#{Process.pid}_#{rand(1_000_000)}")
+    # Minitest reseeds Kernel.srand per test class; Kernel.rand under that
+    # seed reused the same /tmp marker and made later "open" runs empty.
+    File.join(Dir.mktmpdir('letsdo-done'), 'marker')
   end
 
   def fake_backlog_script
