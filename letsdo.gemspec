@@ -35,5 +35,11 @@ Gem::Specification.new do |spec|
   spec.executables   = ["letsdo"]
   spec.require_paths = ["lib"]
 
+  spec.homepage = "https://github.com/sergio-fry/letsdo"
+
+  spec.metadata["homepage_uri"]      = "https://github.com/sergio-fry/letsdo"
+  spec.metadata["source_code_uri"]   = "https://github.com/sergio-fry/letsdo"
+  spec.metadata["changelog_uri"]     = "https://github.com/sergio-fry/letsdo/blob/main/CHANGELOG.md"
   spec.metadata["rubygems_mfa_required"] = "true"
+  spec.metadata["allowed_push_host"] = "https://rubygems.org"
 end
