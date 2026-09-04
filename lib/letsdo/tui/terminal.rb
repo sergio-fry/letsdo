@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "tty-cursor"
+require 'tty-cursor'
 
 module Letsdo
   module Tui
@@ -24,11 +24,14 @@ module Letsdo
       # @param size_provider [Proc] callable → [height, width]; defaults to
       #        TTY::Screen.size; injected in tests for deterministic size
       def initialize(stream:, size_provider: nil)
-        require "tty-screen" unless defined?(TTY::Screen)
+        require 'tty-screen' unless defined?(TTY::Screen)
 
         @stream = stream
         @size_provider = size_provider ||
-                         -> { size = TTY::Screen.size; [size[0] || 24, size[1] || 80] }
+                         lambda {
+                           size = TTY::Screen.size
+                           [size[0] || 24, size[1] || 80]
+                         }
       end
 
       # Enters the alternate screen and hides the cursor.

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require_relative "test_helper"
-require "stringio"
+require_relative 'test_helper'
+require 'stringio'
 
 class TuiTerminalTest < Minitest::Test
   def setup
@@ -24,7 +24,7 @@ class TuiTerminalTest < Minitest::Test
   end
 
   def test_render_moves_cursor_home_then_writes_the_frame
-    @terminal.render("frame")
+    @terminal.render('frame')
 
     assert_equal "\e[1;1Hframe", @stream.string
   end

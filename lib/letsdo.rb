@@ -18,15 +18,15 @@
 #
 # Entry point — bin/letsdo (a thin wrapper over Letsdo::CLI).
 
-require_relative "letsdo/version"
-require_relative "letsdo/errors"
-require_relative "letsdo/prompt_store"
-require_relative "letsdo/output_streamer"
-require_relative "letsdo/pi_runner"
-require_relative "letsdo/agent"
-require_relative "letsdo/backlog_tasks"
-require_relative "letsdo/loop"
-require_relative "letsdo/agent_loop"
-require_relative "letsdo/control"
-require_relative "letsdo/tui"
-require_relative "letsdo/cli"
+require_relative 'letsdo/version'
+require_relative 'letsdo/errors'
+require_relative 'letsdo/prompt_store'
+require_relative 'letsdo/output_streamer'
+require_relative 'letsdo/pi_runner'
+require_relative 'letsdo/agent'
+require_relative 'letsdo/backlog_tasks'
+require_relative 'letsdo/loop'
+require_relative 'letsdo/agent_loop'
+require_relative 'letsdo/control'
+require_relative 'letsdo/tui'
+require_relative 'letsdo/cli'

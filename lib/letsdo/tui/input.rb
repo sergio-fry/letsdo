@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "stringio"
+require 'stringio'
 
 module Letsdo
   module Tui
@@ -21,7 +21,7 @@ module Letsdo
       POLL_TIMEOUT = 0.1
 
       KEY_BY_VALUE = {
-        "p" => :p, "r" => :r, "q" => :q,
+        'p' => :p, 'r' => :r, 'q' => :q,
         "\u0003" => :ctrl_c,
         "\e[A" => :up, "\eOA" => :up,
         "\e[B" => :down, "\eOB" => :down,
@@ -37,7 +37,7 @@ module Letsdo
       # @param stdin [IO] the keyboard stream (a terminal when engaged)
       # @param poll_timeout [Numeric] nil-poll interval for non-tty inputs
       def initialize(stdin:, poll_timeout: POLL_TIMEOUT)
-        require "tty-reader"
+        require 'tty-reader'
 
         @stdin = stdin
         @poll_timeout = poll_timeout

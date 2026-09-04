@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "test_helper"
+require_relative 'test_helper'
 
 class TuiLogBufferTest < Minitest::Test
   def test_write_appends_complete_lines
@@ -9,7 +9,7 @@ class TuiLogBufferTest < Minitest::Test
     log.write("one\ntwo\n")
 
     lines, = log.lines
-    assert_equal ["one", "two"], lines
+    assert_equal %w[one two], lines
   end
 
   def test_partial_last_line_is_kept
@@ -18,27 +18,27 @@ class TuiLogBufferTest < Minitest::Test
     log.write("first line done\nagent text in progre")
 
     lines, = log.lines
-    assert_equal ["first line done", "agent text in progre"], lines
+    assert_equal ['first line done', 'agent text in progre'], lines
   end
 
   def test_partial_line_merges_across_writes
     log = Letsdo::Tui::LogBuffer.new
 
-    log.write("one")
-    log.write(" two")
+    log.write('one')
+    log.write(' two')
     log.write("\nthree\n")
 
     lines, = log.lines
-    assert_equal ["one two", "three"], lines
+    assert_equal ['one two', 'three'], lines
   end
 
   def test_puts_appends_a_newline
     log = Letsdo::Tui::LogBuffer.new
 
-    log.puts("service line")
+    log.puts('service line')
 
     lines, = log.lines
-    assert_equal ["service line"], lines
+    assert_equal ['service line'], lines
   end
 
   def test_puts_without_arguments_appends_an_empty_line
@@ -47,12 +47,12 @@ class TuiLogBufferTest < Minitest::Test
     log.puts
 
     lines, = log.lines
-    assert_equal [""], lines
+    assert_equal [''], lines
   end
 
   def test_empty_writes_are_ignored
     log = Letsdo::Tui::LogBuffer.new
-    log.write("")
+    log.write('')
     log.write(nil)
 
     lines, = log.lines
@@ -65,7 +65,7 @@ class TuiLogBufferTest < Minitest::Test
     log.write("a\nb\nc\nd\n")
 
     lines, = log.lines
-    assert_equal ["b", "c", "d"], lines
+    assert_equal %w[b c d], lines
   end
 
   def test_divider_marks_a_run_boundary
@@ -76,7 +76,7 @@ class TuiLogBufferTest < Minitest::Test
     log.write("b\n")
 
     lines, = log.lines
-    assert_equal ["a", Letsdo::Tui::LogBuffer::DIVIDER, "b"], lines
+    assert_equal ['a', Letsdo::Tui::LogBuffer::DIVIDER, 'b'], lines
   end
 
   def test_divider_is_skipped_when_the_buffer_is_empty

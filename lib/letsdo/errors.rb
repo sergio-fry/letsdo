@@ -17,6 +17,6 @@ module Letsdo
   # Raised by the signal handler to interrupt whatever the main thread is
   # doing (reading pi output, waiting for tasks, ...) so the loop unwinds
   # cleanly. Not a StandardError — nothing rescues it accidentally.
-  class Stopped < Exception
+  class Stopped < StandardError
   end
 end

@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require "json"
-require "open3"
-require "shellwords"
+require 'json'
+require 'open3'
+require 'shellwords'
 
 module Letsdo
   # Task provider for Letsdo::Loop backed by the real backlog CLI:
@@ -23,7 +23,7 @@ module Letsdo
     # @param env [Hash, nil] environment for the CLI child (nil = inherit
     #        the process environment; injected in tests to control the
     #        fake backlog scenarios)
-    def initialize(handle:, command: "backlog", cwd: nil, env: nil)
+    def initialize(handle:, command: 'backlog', cwd: nil, env: nil)
       @handle = handle
       @command = command
       @cwd = cwd
@@ -38,7 +38,7 @@ module Letsdo
       out, _err, status = Open3.capture3(*args, chdir: @cwd)
       return nil unless status.success?
 
-      tasks = JSON.parse(out)["tasks"]
+      tasks = JSON.parse(out)['tasks']
       tasks.is_a?(Array) ? tasks : nil
     rescue Errno::ENOENT, JSON::ParserError, TypeError
       nil
@@ -50,10 +50,10 @@ module Letsdo
     def command_line
       [
         *Shellwords.split(@command),
-        "task", "list",
-        "--assignee", @handle,
-        "--exclude-status", "Done",
-        "--json"
+        'task', 'list',
+        '--assignee', @handle,
+        '--exclude-status', 'Done',
+        '--json'
       ]
     end
   end

@@ -19,14 +19,14 @@ module Letsdo
       # Default maximum number of complete lines kept in the buffer.
       MAX_LINES = 2_000
       # The run-boundary separator line.
-      DIVIDER = "─" * 40
+      DIVIDER = '─' * 40
 
       # @param max_lines [Integer] maximum number of complete lines kept;
       #        older lines are dropped
       def initialize(max_lines: MAX_LINES)
         @mutex = Mutex.new
         @lines = []
-        @pending = +""
+        @pending = +''
         @max_lines = max_lines
         @version = 0
       end

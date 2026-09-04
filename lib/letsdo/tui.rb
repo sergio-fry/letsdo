@@ -16,9 +16,9 @@
 #   Letsdo::Tui::Input      - tty-reader key decoding (injectable)
 #   Letsdo::Tui::Session    - controller: terminal lifecycle + input thread
 
-require_relative "tui/log_buffer"
-require_relative "tui/metrics"
-require_relative "tui/renderer"
-require_relative "tui/terminal"
-require_relative "tui/input"
-require_relative "tui/session"
+require_relative 'tui/log_buffer'
+require_relative 'tui/metrics'
+require_relative 'tui/renderer'
+require_relative 'tui/terminal'
+require_relative 'tui/input'
+require_relative 'tui/session'

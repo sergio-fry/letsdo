@@ -28,56 +28,56 @@
 #                            once (for "N tasks → N runs, then wait" loops).
 #
 
-require "json"
+require 'json'
 
-if (argv_file = ENV["FAKE_BACKLOG_ARGV_FILE"])
-  File.open(argv_file, "a") { |file| file.puts(ARGV.join("|")) }
+if (argv_file = ENV['FAKE_BACKLOG_ARGV_FILE'])
+  File.open(argv_file, 'a') { |file| file.puts(ARGV.join('|')) }
 end
 
-scenario = ENV.fetch("FAKE_BACKLOG_SCENARIO", "open")
-count = Integer(ENV.fetch("FAKE_BACKLOG_COUNT", "2"))
+scenario = ENV.fetch('FAKE_BACKLOG_SCENARIO', 'open')
+count = Integer(ENV.fetch('FAKE_BACKLOG_COUNT', '2'))
 
 titles = %w[Alpha Beta Gamma Delta Epsilon]
 
 # Tasks were already served once → the loop should now see none and wait.
-if (done_file = ENV["FAKE_BACKLOG_DONE_FILE"])
+if (done_file = ENV['FAKE_BACKLOG_DONE_FILE'])
   if File.exist?(done_file)
-    scenario = "empty"
+    scenario = 'empty'
   else
-    File.write(done_file, "done")
+    File.write(done_file, 'done')
   end
 end
 
 tasks = case scenario
-        when "open", ""
+        when 'open', ''
           (1..count).map do |i|
             {
-              "id" => "TASK-#{i}",
-              "title" => titles[(i - 1) % titles.length],
-              "status" => "To Do",
-              "priority" => nil,
-              "assignees" => ["@developer"]
+              'id' => "TASK-#{i}",
+              'title' => titles[(i - 1) % titles.length],
+              'status' => 'To Do',
+              'priority' => nil,
+              'assignees' => ['@developer']
             }
           end
-        when "empty"
+        when 'empty'
           []
-        when "fail"
-          warn "backlog: boom"
+        when 'fail'
+          warn 'backlog: boom'
           exit 1
-        when "malformed"
-          warn "backlog: malformed"
+        when 'malformed'
+          warn 'backlog: malformed'
           exit 0
         else
           warn "Unknown FAKE_BACKLOG_SCENARIO: #{scenario}"
           exit 2
         end
 
-output = JSON.generate({ "schemaVersion" => 1, "kind" => "task-list", "tasks" => tasks })
+output = JSON.generate({ 'schemaVersion' => 1, 'kind' => 'task-list', 'tasks' => tasks })
 
-if (json_file = ENV["FAKE_BACKLOG_JSON"])
+if (json_file = ENV['FAKE_BACKLOG_JSON'])
   File.write(json_file, output)
 else
-  puts(scenario == "malformed" ? "this is not json" : output)
+  puts(scenario == 'malformed' ? 'this is not json' : output)
 end
 
 exit 0

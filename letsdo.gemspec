@@ -26,6 +26,11 @@ Gem::Specification.new do |spec|
   spec.add_runtime_dependency "tty-reader", "~> 0.9"
   spec.add_runtime_dependency "unicode-display_width", ">= 2.0"
 
+  # Development dependency: style checks (default RuboCop config, enforced
+  # in CI). Not installed by the CI workflow via bundler — the workflow
+  # installs the same constraint with `gem install` on a clean Ruby.
+  spec.add_development_dependency "rubocop", "~> 1.77.0"
+
   # RubyGems resolves executables relative to bindir: the literal value
   # "bin/letsdo" would make gem build look for bin/bin/letsdo. The canonical
   # form: bindir="bin" + executables=["letsdo"] — the gem executable file

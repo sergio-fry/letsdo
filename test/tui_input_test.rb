@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
-require_relative "test_helper"
-require "rbconfig"
+require 'English'
+require_relative 'test_helper'
+require 'rbconfig'
 
 # Input decodes raw key bytes from an injected pipe — no real TTY
 # anywhere (tty-reader's mode helpers no-op on non-tty inputs).
@@ -38,9 +39,9 @@ class TuiInputTest < Minitest::Test
   end
 
   def test_decodes_action_keys
-    assert_equal :p, input_for("p").next_key
-    assert_equal :r, input_for("r").next_key
-    assert_equal :q, input_for("q").next_key
+    assert_equal :p, input_for('p').next_key
+    assert_equal :r, input_for('r').next_key
+    assert_equal :q, input_for('q').next_key
   end
 
   def test_decodes_ctrl_c_as_a_key
@@ -48,14 +49,14 @@ class TuiInputTest < Minitest::Test
   end
 
   def test_returns_nil_when_input_is_exhausted
-    input = input_for("q")
+    input = input_for('q')
 
     assert_equal :q, input.next_key
     assert_nil input.next_key
   end
 
   def test_unknown_keys_are_ignored
-    assert_nil input_for("x").next_key
+    assert_nil input_for('x').next_key
     assert_nil input_for("\t").next_key
   end
 
@@ -66,28 +67,30 @@ class TuiInputTest < Minitest::Test
     assert_equal :p, input.next_key
   end
 
-  # CLI does not preload stringio; Input must require it itself. A
-  # same-process test cannot catch that (other files load StringIO), so
-  # this boots a fresh interpreter with only lib/ on the load path.
-  def test_initializes_without_the_test_suite_preloading_stringio
-    lib = File.expand_path("../lib", __dir__)
-    output = IO.popen(
-      [
-        RbConfig.ruby, "-I", lib, "-e",
-        <<~'RUBY'
-          abort "preloaded" if defined?(StringIO)
-          require "letsdo/tui/input"
-          r, w = IO.pipe
-          w.close
-          Letsdo::Tui::Input.new(stdin: r, poll_timeout: 0)
-          print "ok"
-        RUBY
-      ],
-      err: [:child, :out],
+  # Boots a fresh interpreter with only lib/ on the load path and returns
+  # its combined output. CLI does not preload stringio; Input must require
+  # it itself. A same-process test cannot catch that (other files load
+  # StringIO), so the check runs in a subprocess.
+  def ruby_subprocess_output(code)
+    lib = File.expand_path('../lib', __dir__)
+    IO.popen(
+      [RbConfig.ruby, '-I', lib, '-e', code],
+      err: %i[child out],
       &:read
     )
+  end
 
-    assert_equal 0, $?.exitstatus, output
-    assert_equal "ok", output
+  def test_initializes_without_the_test_suite_preloading_stringio
+    output = ruby_subprocess_output(<<~'RUBY')
+      abort "preloaded" if defined?(StringIO)
+      require "letsdo/tui/input"
+      r, w = IO.pipe
+      w.close
+      Letsdo::Tui::Input.new(stdin: r, poll_timeout: 0)
+      print "ok"
+    RUBY
+
+    assert_equal 0, $CHILD_STATUS.exitstatus, output
+    assert_equal 'ok', output
   end
 end

@@ -28,6 +28,6 @@
 # A new agent = a new agents/<name>.md file, no code changes needed.
 #
 
-require_relative "../lib/letsdo"
+require_relative '../lib/letsdo'
 
 exit Letsdo::CLI.run(ARGV)

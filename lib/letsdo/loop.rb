@@ -38,21 +38,37 @@ module Letsdo
     # @return [Integer] number of completed agent runs
     def run
       runs = 0
-      until @stopped
-        tasks = @task_provider.call
-        if tasks.nil? || tasks.empty?
-          @sleeper.call(@wait_seconds)
-          next
-        end
-
-        tasks.each do |task|
-          break if @stopped
-
-          @run_task.call(task)
-          runs += 1
-        end
-      end
+      runs += process_tasks_batch(@task_provider.call) until @stopped
       runs
+    end
+
+    private
+
+    # One provider batch: when there are no tasks the loop waits and
+    # retries; otherwise it runs the agent once per task.
+    #
+    # @return [Integer] number of agent runs completed in this batch
+    def process_tasks_batch(tasks)
+      return wait_for_tasks if tasks.nil? || tasks.empty?
+
+      run_batch(tasks)
+    end
+
+    def wait_for_tasks
+      @sleeper.call(@wait_seconds)
+      0
+    end
+
+    # Runs the agent once per task, stopping early if the loop is stopped.
+    def run_batch(tasks)
+      batch_runs = 0
+      tasks.each do |task|
+        break if @stopped
+
+        @run_task.call(task)
+        batch_runs += 1
+      end
+      batch_runs
     end
   end
 end
