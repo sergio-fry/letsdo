@@ -37,6 +37,13 @@ applies only to tracked artifacts; user conversations may stay in any language.
 Existing backlog history (tasks already written in Russian, open or closed) is
 left as-is — this rule governs new and edited entries only.
 
+**No scratch/debug files in the repo.** When capturing command output for
+debugging (test runs, backtraces, TUI frames), redirect to `/tmp` — never write
+capture files like `*.txt` or `.test_report.txt` into the repository root.
+Tests must not create files in the repo root either; temporary test output
+belongs under `/tmp` or a tmpdir. (Established after debug artifacts polluted
+the repo during TASK-42.)
+
 Canonical project description (single source of truth — reused by the README,
 gemspec, and project rules):
 

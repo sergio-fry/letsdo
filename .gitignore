@@ -4,3 +4,8 @@
 /Gemfile.lock
 *.gem
 /coverage/
+# Debug captures (never commit — redirect to /tmp instead)
+.test_report.txt
+c_tui*.txt
+cli_tui_out.txt
+iso*.txt
