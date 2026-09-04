@@ -99,7 +99,7 @@ The gem is built from the repository:
 git clone git@github.com:sergio-fry/letsdo.git
 cd letsdo
 gem build letsdo.gemspec
-gem install letsdo-0.1.0.gem
+gem install letsdo-0.2.0.gem
 ```
 
 or run it straight from the checkout without installing:

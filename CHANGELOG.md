@@ -1,11 +1,13 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.2.0] - 2026-09-04
 
 ### Added
 
@@ -34,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   during its grace wait (WNOHANG) instead of polling the process table,
   so a signal-killed child's zombie state can no longer stall the stop
   for the full grace period.
+- Gemspec metadata: `homepage`, `homepage_uri`, `source_code_uri`,
+  `changelog_uri`, `allowed_push_host`.
+- `CHANGELOG.md`.
+- Default RuboCop 1.77 as a development dependency; CI fails the build
+  on style violations.
 
 ### Changed
 
@@ -51,14 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   captures the backlog CLI output through `Letsdo::Capture`, whose reader
   threads tolerate the pipes being closed when a stop (TUI quit, signal)
   interrupts an in-flight backlog call and whose cleanup reaps the child
-  even then. Verified green runs show only Minitest dots and the summary;
-  real failures and errors still print.
-
-### Added
-
-- Gemspec metadata: `homepage`, `homepage_uri`, `source_code_uri`, `changelog_uri`,
-  `allowed_push_host`.
-- `CHANGELOG.md`.
+  even then.
+- CLI tests no longer collide on a shared `/tmp` “tasks already served”
+  marker after Minitest reseeds `Kernel.srand` per test class.
 
 ## [0.1.0] - 2026-09-04
 
@@ -73,5 +75,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Minitest tests; CI (GitHub Actions) builds the gem and runs tests on every push.
 - Local executable `letsdo`.
 
-[Unreleased]: https://github.com/sergio-fry/letsdo/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/sergio-fry/letsdo/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/sergio-fry/letsdo/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/sergio-fry/letsdo/releases/tag/v0.1.0
