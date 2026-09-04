@@ -1,115 +1,273 @@
 # letsdo
 
-A local agent worker for Backlog.md/markdown tasks.
+> A local agent worker for Backlog.md/markdown tasks.
 
-A Ruby gem: the `lib/letsdo` library (OOP structure: agents, the `agents/`
-prompt store, the pi output streamer, error handling, the orchestrator loop)
-and the executable `bin/letsdo`. In the future the gem moves to its own
-repository — for now it lives in the `letsdo/` folder at the project root.
+Letsdo turns a plain markdown backlog into a team of autonomous agents.
+Each agent is just a prompt file in `agents/`; run `letsdo <name>` and the
+agent picks up all open tasks assigned to it, one task per run, loops back
+for new ones, and stops cleanly on `Ctrl+C`. No framework code, no hosted
+platform — the backlog folder is the single source of truth.
 
-## Usage
+[![CI](https://github.com/sergio-fry/letsdo/actions/workflows/ci.yml/badge.svg)](https://github.com/sergio-fry/letsdo/actions)
 
-From the `letsdo/` folder:
+## Table of contents
+
+- [Why letsdo](#why-letsdo)
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Getting started](#getting-started)
+- [Configuration](#configuration)
+- [How it works](#how-it-works)
+- [Development](#development)
+- [Alternatives](#alternatives)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Why letsdo
+
+- **Your backlog already exists.** If you track work in a
+  Backlog.md/markdown project (a `backlog/` folder of markdown tasks), you
+  already have everything letsdo needs. The tasks are the instructions;
+  letsdo only executes them.
+- **Zero-config team.** A new agent is a new file: `agents/<name>.md`
+  with the agent's instructions. The assignee handle is derived from the
+  name (`@developer` ↔ `developer`), so the agent automatically works on
+  the tasks already assigned to it. No code, no schemas, no setup.
+- **One task per run — honest work.** Each run picks up exactly one open
+  task and completes it before the next. No context-switching, no runaway
+  loops: the orchestrator loop assigns the next task only after the current
+  one finishes, and pauses when there is nothing to do.
+- **Local and private.** Everything runs on your machine — `pi` in
+  `--mode json` under the hood. No hosted agents, no task data leaving
+  your project.
+- **Observable.** The stream shows exactly what the agent is doing:
+  agent text on stdout, tool calls with `HH:MM:SS` timestamps and
+  completion durations on stderr.
+
+Use it when you want a local, convention-driven worker that executes
+backlog tasks autonomously: development chores, analysis spikes, doc
+generation, any repeatable task flow you can express as assignee + prompt.
+
+## Features
+
+- **One-command agent run** — `letsdo <name>` starts the loop: all open
+  tasks assigned to `@<name>` are done one after another (one agent run =
+  one task), then the loop waits for new ones until stopped with
+  `SIGINT/SIGTERM` (clean exit, code 0).
+- **Agents as prompt files** — `agents/<name>.md` is the whole identity of
+  an agent: role, rules, workflow. Add a file, get an agent.
+- **Built-in default prompt** — an agent starts even without a prompt file:
+  it runs on the built-in default prompt (process-only instructions), and
+  letsdo announces once where the prompt was looked for and how to create
+  it (`letsdo <name> --init`).
+- **`--init` scaffold** — `letsdo <name> --init` creates
+  `agents/<name>.md` with the starter default prompt so you can customize
+  it. It never runs the agent and never overwrites an existing file.
+- **Orchestrator loop** — retries every 10 s (configurable) when there are
+  no open tasks, pauses when the backlog is unreadable instead of crashing,
+  and stops instantly on `Ctrl+C`.
+- **Streaming output** — agent text streams to stdout as it is generated;
+  service and tool lines go to stderr with a shared `HH:MM:SS` prefix:
+  tool start (`⚙ name: args`), completion with duration
+  (`✓/✖ name: … (3s)`), indented results (trimmed with a summary note
+  when large), and error results marked (`✖ Error: ...`).
+- **`--version` / `--help`** — `Letsdo::VERSION` and usage, exit 0.
+- **Available as a library** — `require "letsdo"` exposes the
+  `Letsdo` module (`Letsdo::VERSION`, `Letsdo::PromptStore`, `Letsdo::Agent`,
+  ...) for embedding or testing.
+
+## Requirements
+
+- Ruby **>= 3.0**.
+- The [pi](https://github.com/earendil-works/pi) agent CLI on
+  `PATH` — this is the AI backend that runs the agent (`pi --mode json`).
+  The command is configurable via `LETSDO_PI_COMMAND`.
+- The Backlog.md CLI (`backlog`) on `PATH` — the task provider reads open
+  tasks via `backlog task list --assignee <handle>`. Configurable via
+  `LETSDO_BACKLOG_COMMAND`.
+
+Tests and the build use only Ruby's bundled default gems (Minitest, Rake) —
+no `bundle install` needed.
+
+## Installation
+
+The gem is built from the repository:
 
 ```sh
-./bin/letsdo <name>    # read agents/<name>.md and run pi (exit = pi code)
-./bin/letsdo --version # gem version (from lib/letsdo/version.rb), exit 0
-./bin/letsdo --help    # help, exit 0
-./bin/letsdo           # usage and agent list, exit 1
+git clone git@github.com:sergio-fry/letsdo.git
+cd letsdo
+gem build letsdo.gemspec
+gem install letsdo-0.1.0.gem
 ```
 
-The project root (where `agents/` lives) is `LETSDO_ROOT`, default is the
-current folder. Extra pi flags — `LETSDO_PI_FLAGS` (or `AGENT_PI_FLAGS` for
-`bin/agent` compatibility), pi command — `LETSDO_PI_COMMAND` (default `pi`,
-overridden in tests).
+or run it straight from the checkout without installing:
 
-As a library:
-
-```ruby
-require "letsdo"        # module Letsdo, Letsdo::VERSION
+```sh
+cd letsdo
+./bin/letsdo --version
 ```
 
-## Code structure
+## Getting started
 
-Gem OOP structure:
+Letsdo works in a Backlog.md project root — a folder that holds the
+`backlog/` tasks and your `agents/` prompts:
 
-```
-letsdo/
-  bin/letsdo            # entry point: thin wrapper over Letsdo::CLI
-  lib/letsdo.rb         # module Letsdo, requires all components
-  lib/letsdo/errors.rb # Letsdo::Errors: error hierarchy
-  lib/letsdo/prompt_store.rb  # Letsdo::PromptStore: agents/*.md prompts
-  lib/letsdo/output_streamer.rb # Letsdo::OutputStreamer: where output is printed
-  lib/letsdo/pi_runner.rb     # Letsdo::PiRunner: running pi --mode json
-  lib/letsdo/agent.rb         # Letsdo::Agent: a single agent run
-  lib/letsdo/loop.rb          # Letsdo::Loop: orchestrator loop
-  lib/letsdo/cli.rb           # Letsdo::CLI: arguments, usage, exit code
-  test/                 # Minitest tests (test/*_test.rb, fixtures/fake_pi)
-  letsdo.gemspec        # name=letsdo, executables=["bin/letsdo"]
-  Gemfile               # gemspec
-  Rakefile              # rake test
-  README.md
-  LICENSE               # MIT
+```sh
+cd your-backlog-project
+
+# create an agent prompt (once)
+letsdo developer --init        # writes agents/developer.md, never runs the agent
+
+# or write agents/developer.md by hand — the file is the agent's instructions
+
+# run the agent: it works through all open tasks assigned to @developer
+letsdo developer
 ```
 
-Class responsibilities:
+The loop prints service messages on stderr (started, which task is being
+run, no open tasks / backlog unavailable, stopped) and streams the agent's
+text on stdout. Stop the loop with `Ctrl+C` — a running agent child is
+terminated and the process exits with code 0.
 
-- **Letsdo::Errors** — the package error hierarchy: `Letsdo::Error` (base),
-  `Letsdo::UnknownAgentError` (an agent is not in `agents/`, carries `.name`).
-- **Letsdo::PromptStore** — access to `agents/<name>.md` prompts in the
-  project root: `list` (sorted names), `read(name)` (contents or
-  `UnknownAgentError`). A new agent = a new file, no code changes needed.
-- **Letsdo::OutputStreamer** — routes pi output across two streams: the
-  answer text (text_delta) — to stdout, service tool lines — to stderr.
-  Every action line gets a shared `HH:MM:SS` time prefix (start
-  `⚙ name: arguments`, completion `✓/✖ name: … (Xs)`), the result is an
-  indented block, big output is trimmed with a summary note, error results
-  are marked (`✖ Error: ...`); `finish` guarantees a final newline. The
-  action duration is visible from the difference between the start and
-  completion time prefixes.
-- **Letsdo::PiRunner** — runs `pi --mode json <flags> <prompt>`, reads the
-  line-by-line event stream, hands the streamer `text_delta` (agent text),
-  tool headers and results (`tool_execution_start`/`_end`), ignores non-JSON
-  and unrelated events, propagates the pi exit code (including 128+signal).
-  The pi command is overridable (`command:`) — for tests.
-- **Letsdo::Agent** — a single agent run: reads the prompt from `agents/`
-  via `PromptStore` and runs `PiRunner`. Returns the pi exit code; for an
-  unknown name raises `UnknownAgentError`. This is the logic of a single
-  run of the old `bin/agent`, moved into the gem.
-- **Letsdo::Loop** — the orchestrator loop: while the provider gives open
-  tasks — runs the agent (one run = one task); no tasks — waits and checks
-  again; `nil` from the provider = the backlog is unreadable, the agent is
-  not run. Stopping — only from outside via `#stop` (e.g. by a
-  SIGINT/SIGTERM handler, as in `bin/agent-loop`). The provider and the
-  runner are injected — this way the loop is testable without a real
-  backlog and pi.
-- **Letsdo::CLI** — argument parsing and launching: usage and agent list
-  with no argument (exit 1), `--version`/`--help` (exit 0), unknown option
-  (exit 1), unknown agent — message + list (exit 1); known agent — a run
-  through `Letsdo::Agent`, pi exit code.
+No prompt file? No problem:
+
+```
+$ letsdo newcomer
+letsdo: no prompt for newcomer at /home/user/backlog-project/agents/newcomer.md
+letsdo: using the built-in default prompt (create a prompt file with 'letsdo newcomer --init')
+```
+
+The agent still runs — on the built-in default prompt. The notification is
+printed once per process. The looked-up path is exactly
+`<LETSDO_ROOT>/agents/<name>.md`.
+
+CLI reference:
+
+```
+letsdo <name>              # run the <name> agent in the loop (exit 0 on stop)
+letsdo <name> --init       # create agents/<name>.md, never run the agent (exit 0)
+letsdo --init <name>       # same as above (flag-first form)
+letsdo --version           # gemspec version, exit 0
+letsdo --help              # usage and agent list, exit 0
+letsdo                     # usage and agent list, exit 1
+letsdo --badopt            # "unknown option" + usage, exit 1
+```
+
+`--init` fails with exit 1 and a message on stderr when the file already
+exists (never overwrites) or the agent name is unsafe (contains `/` or `\`,
+or is `.`/`..` — nothing is ever written outside `agents/`).
+
+## Configuration
+
+All knobs are environment variables:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `LETSDO_ROOT` | current folder | Project root where `agents/` lives (and where the `backlog` CLI finds `backlog/`). |
+| `LETSDO_PI_FLAGS` | — | Extra pi flags, e.g. `--model anthropic/claude-sonnet-4-5` (split on whitespace). |
+| `AGENT_PI_FLAGS` | — | Fallback for `LETSDO_PI_FLAGS` (compatibility with the old `bin/agent`). |
+| `LETSDO_PI_COMMAND` | `pi` | The pi command used to run agents; overridable for tests / fake pi. |
+| `AGENT_ASSIGNEE_HANDLE` | `@<name>` | The agent's backlog assignee handle. The one rule: handle = name. |
+| `LETSDO_WAIT_SECONDS` | 10 | Retry interval when there are no open tasks. |
+| `AGENT_WAIT_SECONDS` | — | Fallback for `LETSDO_WAIT_SECONDS` (`bin/agent-loop` compatibility). |
+| `LETSDO_BACKLOG_COMMAND` | `backlog` | The Backlog.md CLI command used as the task provider. |
+| `LETSDO_DEBUG` | — | Set to `1` to trace loop decisions on stderr. |
+
+## How it works
+
+```
+bin/letsdo ──► Letsdo::CLI ──► Letsdo::Agent ──► Letsdo::PiRunner (pi --mode json)
+                     │                │                    │
+                     │                │              Letsdo::OutputStreamer (stdout/stderr)
+                     ▼                ▼
+             Letsdo::BacklogTasks  Letsdo::AgentLoop
+             (backlog CLI → tasks) (orchestrator loop)
+```
+
+- `Letsdo::CLI` — argument parsing, usage, exit codes; builds the agent, the
+  task provider and the loop.
+- `Letsdo::PromptStore` — access to `agents/<name>.md` prompts; `--init`
+  writes them via `create_agent` (no overwrite, safe names only).
+- `Letsdo::DefaultPrompt` — the built-in default prompt: the single source
+  of truth used both for the fallback run and as the `--init` template.
+- `Letsdo::Agent` — one agent run: the prompt (file or default) + a `pi`
+  child process; returns the pi exit code.
+- `Letsdo::PiRunner` — spawns `pi --mode json <flags> <prompt>`, parses the
+  line-by-line event stream, feeds the streamer, propagates the pi exit
+  code (including 128+signal).
+- `Letsdo::OutputStreamer` — routes agent text to stdout and service/tool
+  lines to stderr with `HH:MM:SS` prefixes and durations.
+- `Letsdo::BacklogTasks` — the task provider: open tasks for a handle via
+  `backlog task list --assignee <handle> --exclude-status Done --json`;
+  `nil` when the backlog is unreadable (the loop pauses instead of running
+  the agent).
+- `Letsdo::Loop` / `Letsdo::AgentLoop` — the orchestrator: tasks → one run
+  each → wait → repeat; stopped from outside via `SIGINT/SIGTERM` (the
+  running pi child is terminated, exit 0).
+
+Multiple agents run as separate processes, each with its own loop and its
+own assignee; they coordinate through the shared backlog — nothing else in
+common. This repository itself is run by letsdo: `agents/developer.md` and
+`agents/analyst.md` are its own workers on the `backlog/` tasks.
 
 ## Development
 
-Tests use Minitest bundled with Ruby (the simple `assert`/`refute` syntax,
-no external DSLs or mock frameworks). Covered: `agents/` prompt reading,
-known/unknown agent, output assembly from `text_delta`, tool headers and
-results (including errors and big-output trimming), `HH:MM:SS` time prefixes
-on action lines, exit-code propagation, the orchestrator loop, CLI. The fake
-pi — `test/fixtures/fake_pi` — emulates the `pi --mode json` event stream for
-deterministic tests (scenarios `FAKE_PI_SCENARIO=default|error|big|stub`).
-
-Running tests without external gems:
+The gem uses Minitest (bundled with Ruby, plain `assert`/`refute`, no
+external DSLs or mock frameworks), so tests run on a clean Ruby:
 
 ```sh
-rake test                 # all tests
-ruby -Itest -Ilib test/prompt_store_test.rb   # one file
+rake test                                  # all tests
+ruby -Itest -Ilib test/cli_test.rb         # one test file
 ```
+
+Test fixtures: `test/fixtures/fake_pi` emulates the `pi --mode json` event
+stream (`FAKE_PI_SCENARIO=default|error|big|stub`); the CLI snapshots the
+spawned fake-pi argv per run, which tests assert on.
 
 Building the gem:
 
 ```sh
 gem build letsdo.gemspec
 ```
+
+Cleanliness is enforced by the CI workflow
+(`.github/workflows/ci.yml`): gem build + `rake test` on every push,
+Ruby 3.3 (satisfies `required_ruby_version: ">= 3.0"`).
+
+## Alternatives
+
+| Tool | What it is | What's similar | What's different |
+| --- | --- | --- | --- |
+| [Claude Code](https://github.com/anthropics/claude-code) | Anthropic's terminal agent | Local, terminal-driven, works in your repository | Interactive chat sessions you drive; no backlog loop, no one-task-per-run contract, no multi-agent-by-convention |
+| [OpenAI Codex CLI](https://github.com/openai/codex) | OpenAI's terminal coding agent | Local agent on the command line | Same interactive pattern; session-based, not a task-execution worker |
+| [CrewAI](https://github.com/crewAIInc/crewAI) / [AutoGPT](https://github.com/Significant-Gravitas/AutoGPT) | Agent orchestration frameworks (Python) | Multi-agent teams and roles | The team, tools and workflow are code and configuration; no built-in task-tracker loop |
+| [aider](https://github.com/Aider-AI/aider) | Pair-programming CLI | Local AI pair for code changes | Focused on interactive coding pairs, not executing a tracked backlog |
+
+What none of them do out of the box: take an existing markdown backlog,
+derive the team from the assignee handles, and execute the tasks one per
+run with an observable loop. That is letsdo's niche — a thin convention
+layer instead of a framework. If your project is tracked in Backlog.md
+format and you want a local, observable, multi-agent worker on top of it,
+letsdo is the smallest thing that does it.
+
+## Contributing
+
+Contributions are welcome. The project is small and intentionally so —
+please keep it that way.
+
+- **Language.** All task tracking, prompts, docs and comments are in
+  English (project convention). New code and docs follow suit.
+- **Where the code lives.** `bin/letsdo` (entry point),
+  `lib/letsdo/` (CLI, PromptStore, DefaultPrompt, Agent, PiRunner,
+  OutputStreamer, BacklogTasks, Loop, AgentLoop), `test/` (Minitest +
+  fixtures), `letsdo.gemspec`, `.github/workflows/ci.yml`.
+- **Before opening a PR:** `rake test` must pass with 0 failures and the
+  gem must build (`gem build letsdo.gemspec`) — the same checks CI runs on
+  every push.
+- **Dogfooding.** This repository manages itself with letsdo: new work is
+tracked as Backlog tasks, and `agents/developer.md` / `agents/analyst.md`
+execute them. Every change is a chance to exercise the tool.
 
 ## License
 
