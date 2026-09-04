@@ -11,10 +11,37 @@ class CliTest < Minitest::Test
   end
 
   # Runs Letsdo::CLI with a test environment (root = a temporary project).
-  def run_cli(argv, prompts:, env: {})
+  def run_cli(argv, prompts:, env: {}, sleeper: nil)
     with_project(prompts) do |root|
-      Letsdo::CLI.run(argv, env: env.merge("LETSDO_ROOT" => root), stdout: @out, stderr: @err)
+      Letsdo::CLI.run(argv, env: env.merge("LETSDO_ROOT" => root), stdout: @out, stderr: @err,
+                      sleeper: sleeper)
     end
+  end
+
+  # A sleeper that makes the orchestrator loop stop on its first wait.
+  def stop_on_first_wait
+    ->(_seconds) { throw Letsdo::AgentLoop::STOP }
+  end
+
+  # The fake backlog command with the scenario/count environment override.
+  # The "open" scenario is self-consumed via FAKE_BACKLOG_DONE_FILE: the
+  # first call returns the tasks, later calls see the done file and become
+  # empty, so the loop reaches its waiting/stop path.
+  def fake_backlog_env(scenario: "open", count: nil, extra: {})
+    env = { "LETSDO_BACKLOG_COMMAND" => fake_backlog_script, "FAKE_BACKLOG_SCENARIO" => scenario }
+    env["FAKE_BACKLOG_COUNT"] = count.to_s if count
+    if scenario == "open"
+      # A plain path (not a Tempfile): Tempfile finalizers unlink the file
+      # on GC, which would wipe the fake_backlog "done" marker mid-test and
+      # make the loop see open tasks forever.
+      env["FAKE_BACKLOG_DONE_FILE"] =
+        File.join(Dir.tmpdir, "fake_backlog_done_#{Process.pid}_#{rand(1_000_000)}")
+    end
+    env.merge(extra)
+  end
+
+  def fake_backlog_script
+    File.expand_path("fixtures/fake_backlog", __dir__)
   end
 
   def test_no_args_prints_usage_and_agents_exit_1
@@ -62,22 +89,54 @@ class CliTest < Minitest::Test
     assert_includes @out.string, "looptest"
   end
 
-  def test_known_agent_returns_exit_code_of_pi
+  def test_open_tasks_are_run_one_per_task
+    Tempfile.create("fake_pi_argv") do |file|
+      old = ENV["FAKE_PI_ARGV_FILE"]
+      ENV["FAKE_PI_ARGV_FILE"] = file.path
+      begin
+        code = run_cli(["developer"], prompts: { "developer" => "You are a developer." },
+                       env: fake_backlog_env(count: 3).merge("LETSDO_PI_COMMAND" => fake_pi),
+                       sleeper: stop_on_first_wait)
+      ensure
+        ENV["FAKE_PI_ARGV_FILE"] = old
+      end
+
+      assert_equal 0, code
+      assert_equal 3, File.read(file.path).lines.length
+      # One agent run per open task: the agent output appears once per run.
+      assert_equal "Hello, world!\n" * 3, @out.string
+    end
+  end
+
+  def test_without_open_tasks_the_loop_waits
+    code = run_cli(["developer"], prompts: { "developer" => "You are a developer." },
+                   env: fake_backlog_env(scenario: "empty").merge("LETSDO_PI_COMMAND" => fake_pi),
+                   sleeper: stop_on_first_wait)
+
+    assert_equal 0, code
+    assert_includes @err.string, "letsdo: no open tasks for developer"
+    assert_equal "", @out.string
+  end
+
+  def test_agent_exit_code_is_logged_but_not_propagated
     old = ENV["FAKE_PI_EXIT"]
     ENV["FAKE_PI_EXIT"] = "7"
     begin
       code = run_cli(["developer"], prompts: { "developer" => "You are a developer." },
-                     env: { "LETSDO_PI_COMMAND" => fake_pi })
+                     env: fake_backlog_env(count: 1).merge("LETSDO_PI_COMMAND" => fake_pi),
+                     sleeper: stop_on_first_wait)
     ensure
       ENV["FAKE_PI_EXIT"] = old
     end
 
-    assert_equal 7, code
+    assert_equal 0, code
+    assert_includes @err.string, "letsdo: developer exited with code 7"
   end
 
   def test_known_agent_assembles_output_via_pi
     code = run_cli(["developer"], prompts: { "developer" => "You are a developer." },
-                   env: { "LETSDO_PI_COMMAND" => fake_pi })
+                   env: fake_backlog_env(count: 1).merge("LETSDO_PI_COMMAND" => fake_pi),
+                   sleeper: stop_on_first_wait)
 
     assert_equal 0, code
     assert_equal "Hello, world!\n", @out.string
@@ -89,7 +148,9 @@ class CliTest < Minitest::Test
       ENV["FAKE_PI_ARGV_FILE"] = file.path
       begin
         run_cli(["developer"], prompts: { "developer" => "You are a developer." },
-                 env: { "LETSDO_PI_COMMAND" => fake_pi, "LETSDO_PI_FLAGS" => "--model m" })
+                 env: fake_backlog_env(count: 1).merge("LETSDO_PI_COMMAND" => fake_pi,
+                                                       "LETSDO_PI_FLAGS" => "--model m"),
+                 sleeper: stop_on_first_wait)
       ensure
         ENV["FAKE_PI_ARGV_FILE"] = old
       end
@@ -104,12 +165,49 @@ class CliTest < Minitest::Test
       ENV["FAKE_PI_ARGV_FILE"] = file.path
       begin
         run_cli(["developer"], prompts: { "developer" => "You are a developer." },
-                 env: { "LETSDO_PI_COMMAND" => fake_pi, "AGENT_PI_FLAGS" => "--model m" })
+                 env: fake_backlog_env(count: 1).merge("LETSDO_PI_COMMAND" => fake_pi,
+                                                       "AGENT_PI_FLAGS" => "--model m"),
+                 sleeper: stop_on_first_wait)
       ensure
         ENV["FAKE_PI_ARGV_FILE"] = old
       end
 
       assert_includes File.read(file.path), "--mode|json|--model|m|"
     end
+  end
+
+  def test_assignee_handle_override_env
+    Tempfile.create("fake_backlog_argv") do |file|
+      old = ENV["FAKE_BACKLOG_ARGV_FILE"]
+      ENV["FAKE_BACKLOG_ARGV_FILE"] = file.path
+      begin
+        run_cli(["developer"], prompts: { "developer" => "You are a developer." },
+                 env: fake_backlog_env(count: 1).merge("LETSDO_PI_COMMAND" => fake_pi,
+                                                       "AGENT_ASSIGNEE_HANDLE" => "@someone"),
+                 sleeper: stop_on_first_wait)
+      ensure
+        ENV["FAKE_BACKLOG_ARGV_FILE"] = old
+      end
+
+      assert_includes File.read(file.path), "--assignee|@someone|"
+    end
+  end
+
+  def test_wait_seconds_from_env
+    code = run_cli(["developer"], prompts: { "developer" => "You are a developer." },
+                   env: fake_backlog_env(scenario: "empty").merge(
+                     "LETSDO_PI_COMMAND" => fake_pi, "LETSDO_WAIT_SECONDS" => "3.5"
+                   ),
+                   sleeper: stop_on_first_wait)
+
+    assert_equal 0, code
+    assert_includes @err.string, "retrying in 3.5s"
+  end
+
+  def test_unknown_agent_fails_before_the_loop
+    code = run_cli(["nosuch"], prompts: { "developer" => "x" })
+
+    assert_equal 1, code
+    assert_includes @err.string, "Unknown agent: nosuch"
   end
 end

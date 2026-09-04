@@ -22,13 +22,18 @@ module Letsdo
       @command = command
     end
 
+    # The runner of the last/current run — lets the orchestrator terminate
+    # a running pi when the loop is stopped.
+    attr_reader :runner
+
     # Runs the agent once.
     #
     # @return [Integer] pi exit code
     # @raise [UnknownAgentError] if the agent is not in agents/
     def run
       prompt = prompt_store.read(@name)
-      PiRunner.new(prompt: prompt, flags: @flags, streamer: @streamer, command: @command).run
+      @runner = PiRunner.new(prompt: prompt, flags: @flags, streamer: @streamer, command: @command)
+      @runner.run
     end
 
     private

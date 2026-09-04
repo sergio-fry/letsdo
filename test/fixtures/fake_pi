@@ -25,7 +25,7 @@
 require "json"
 
 if (argv_file = ENV["FAKE_PI_ARGV_FILE"])
-  File.write(argv_file, ARGV.join("|"))
+  File.open(argv_file, "a") { |file| file.puts(ARGV.join("|")) }
 end
 
 def toolcall_start(id, name)
@@ -117,5 +117,7 @@ events =
   end
 
 events.each { |event| puts JSON.generate(event) }
+
+sleep Float(ENV.fetch("FAKE_PI_SLEEP", "0"))
 
 exit Integer(ENV.fetch("FAKE_PI_EXIT", "0"))

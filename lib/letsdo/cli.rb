@@ -1,46 +1,62 @@
 # frozen_string_literal: true
 
-require "shellwords"
+require 'shellwords'
 
 module Letsdo
-  # Command-line argument parsing and running a single agent.
+  # Command-line argument parsing and running an agent orchestrator loop.
   #
   # CLI keeps the scaffold contract (TASK-20) and adds agent launching:
   #   letsdo                       — usage and agent list, exit code 1;
   #   letsdo --version             — version, exit code 0;
   #   letsdo --help                — usage, exit code 0;
-  #   letsdo <name>                — read agents/<name>.md, run pi,
-  #                                    exit code of pi;
+  #   letsdo <name>                — run the <name> agent in the orchestrator
+  #                                    loop until SIGINT/SIGTERM: all open
+  #                                    tasks assigned to the agent are done
+  #                                    one run per task, the loop waits for
+  #                                    new ones; clean exit code 0;
   #   letsdo <unknown name>        — "Unknown agent: <name>" + list,
   #                                    exit code 1.
   #   letsdo <unknown option>      — "letsdo: unknown option: X" + usage,
   #                                    exit code 1.
   #
   # Environment:
-  #   LETSDO_ROOT         project root (agents/ lives there); default — pwd.
-  #   LETSDO_PI_FLAGS     extra pi flags (split on whitespace; if unset —
-  #                       AGENT_PI_FLAGS is used for bin/agent compatibility).
-  #   LETSDO_PI_COMMAND   the pi command (default "pi"); overridable for
-  #                       tests/fake pi.
+  #   LETSDO_ROOT              project root (agents/ lives there); default — pwd.
+  #   LETSDO_PI_FLAGS          extra pi flags (split on whitespace; if unset —
+  #                            AGENT_PI_FLAGS is used for bin/agent
+  #                            compatibility).
+  #   LETSDO_PI_COMMAND        the pi command (default "pi"); overridable for
+  #                            tests/fake pi.
+  #   AGENT_ASSIGNEE_HANDLE    the agent's backlog assignee handle; default
+  #                            "@<name>" (the one rule: handle = name).
+  #   LETSDO_WAIT_SECONDS      retry interval when no tasks are open (if
+  #                            unset — AGENT_WAIT_SECONDS, default 10).
+  #   LETSDO_BACKLOG_COMMAND   the backlog CLI command (default "backlog");
+  #                            overridable for tests/fake backlog.
   class CLI
-    USAGE = "Usage: letsdo <agent_name>"
-    AGENTS_HEADER = "Available agents:"
+    USAGE = 'Usage: letsdo <agent_name>'
+    AGENTS_HEADER = 'Available agents:'
+    DEFAULT_WAIT_SECONDS = 10.0
 
     # @param argv [Array<String>] command-line arguments
     # @param env [Hash] process environment (LETSDO_ROOT, LETSDO_PI_FLAGS,
-    #        AGENT_PI_FLAGS); injected in tests
+    #        AGENT_PI_FLAGS, AGENT_ASSIGNEE_HANDLE, LETSDO_WAIT_SECONDS,
+    #        LETSDO_BACKLOG_COMMAND); injected in tests
     # @param stdout [IO] stream for normal output (usage, --help, list)
     # @param stderr [IO] stream for service output
-    # @return [Integer] exit code: 0 — success, 1 — error, otherwise — pi exit code
-    def self.run(argv, env: ENV, stdout: $stdout, stderr: $stderr)
-      new(env: env, stdout: stdout, stderr: stderr).run(argv)
+    # @param sleeper [Proc, nil] waiting procedure for the loop (callable
+    #        with the interval); injected in tests for deterministic stops
+    # @return [Integer] exit code: 0 — success (incl. loop stop), 1 — error,
+    #         otherwise — pi exit code
+    def self.run(argv, env: ENV, stdout: $stdout, stderr: $stderr, sleeper: nil)
+      new(env: env, stdout: stdout, stderr: stderr, sleeper: sleeper).run(argv)
     end
 
-    def initialize(env:, stdout:, stderr:)
+    def initialize(env:, stdout:, stderr:, sleeper: nil)
       @env = env
       @stdout = stdout
       @stderr = stderr
-      @root = env.fetch("LETSDO_ROOT", Dir.pwd)
+      @sleeper = sleeper
+      @root = env.fetch('LETSDO_ROOT', Dir.pwd)
     end
 
     # @param argv [Array<String>] command-line arguments
@@ -48,17 +64,17 @@ module Letsdo
     def run(argv)
       arg = argv[0]
       case arg
-      when "--version", "-v"
+      when '--version', '-v'
         @stdout.puts(VERSION)
         0
-      when "--help", "-h"
+      when '--help', '-h'
         print_usage(@stdout)
         0
       when nil
         print_usage(@stderr)
         1
       else
-        if arg.start_with?("-")
+        if arg.start_with?('-')
           @stderr.puts("letsdo: unknown option: #{arg}")
           print_usage(@stderr)
           1
@@ -71,18 +87,51 @@ module Letsdo
     private
 
     def run_agent(name)
+      # The prompt must exist before the loop starts: an unknown agent fails
+      # fast (exit 1) instead of spinning in the loop.
+      PromptStore.new(root: @root).read(name)
+
       streamer = OutputStreamer.new(stdout: @stdout, stderr: @stderr)
       agent = Agent.new(name: name, root: @root, flags: parse_pi_flags, streamer: streamer,
                         command: pi_command)
-      agent.run
+      handle = assignee_handle(name)
+      provider = BacklogTasks.new(handle: handle, command: backlog_command, cwd: @root,
+                                  env: ENV.to_h.merge(@env))
+      loop = AgentLoop.new(name: name, handle: handle, agent: agent,
+                           task_provider: -> { provider.call },
+                           wait_seconds: wait_seconds, sleeper: @sleeper, stderr: @stderr)
+      loop.run
     rescue UnknownAgentError => e
       @stderr.puts(e.message)
       print_agents
       1
     end
 
+    # The agent's assignee handle: AGENT_ASSIGNEE_HANDLE override, otherwise
+    # the one rule — '@' + agent name.
+    def assignee_handle(name)
+      env_handle = @env['AGENT_ASSIGNEE_HANDLE']
+      env_handle && !env_handle.strip.empty? ? env_handle : "@#{name}"
+    end
+
+    def backlog_command
+      @env.fetch('LETSDO_BACKLOG_COMMAND', 'backlog')
+    end
+
+    # The retry interval when no tasks are open: LETSDO_WAIT_SECONDS, then
+    # AGENT_WAIT_SECONDS (bin/agent-loop compatibility), default 10 seconds.
+    def wait_seconds
+      value = @env['LETSDO_WAIT_SECONDS'].to_s.strip
+      value = @env['AGENT_WAIT_SECONDS'].to_s.strip if value.empty?
+      return DEFAULT_WAIT_SECONDS if value.empty?
+
+      Float(value)
+    rescue ArgumentError, TypeError
+      DEFAULT_WAIT_SECONDS
+    end
+
     def pi_command
-      @env.fetch("LETSDO_PI_COMMAND", PiRunner::COMMAND)
+      @env.fetch('LETSDO_PI_COMMAND', PiRunner::COMMAND)
     end
 
     def print_usage(stream)
@@ -99,8 +148,8 @@ module Letsdo
     # For bin/agent compatibility, when LETSDO_PI_FLAGS is absent
     # AGENT_PI_FLAGS is used.
     def parse_pi_flags
-      value = @env["LETSDO_PI_FLAGS"].to_s
-      value = @env["AGENT_PI_FLAGS"].to_s if value.strip.empty?
+      value = @env['LETSDO_PI_FLAGS'].to_s
+      value = @env['AGENT_PI_FLAGS'].to_s if value.strip.empty?
       return [] if value.strip.empty?
 
       Shellwords.split(value)

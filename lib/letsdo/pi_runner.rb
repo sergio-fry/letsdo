@@ -37,37 +37,111 @@ module Letsdo
     # @param flags [Array<String>] extra pi flags
     # @param streamer [OutputStreamer] where to print output
     # @param command [String] the pi command (overridable for tests)
-    def initialize(prompt:, flags: [], streamer:, command: COMMAND)
+    # @param debug [Boolean, nil] trace [letsdo] lines to stderr; nil = LETSDO_DEBUG
+    def initialize(prompt:, flags: [], streamer:, command: COMMAND, debug: nil)
       @prompt = prompt
       @flags = flags
       @streamer = streamer
       @command = command
       @pending_tools = {}
+      @debug = debug.nil? ? ENV["LETSDO_DEBUG"] == "1" : debug
     end
 
     # Runs pi and waits for completion.
+    #
+    # pi is spawned in its own process group so the orchestrator can stop it
+    # (signal handlers interrupt the loop, not the pi child directly): a stop
+    # terminates the whole group via #terminate.
+    #
+    # The event stream is read on the main thread. A stop signal arrives as
+    # Letsdo::Stopped raised by the trap (see Letsdo::AgentLoop#on_signal):
+    # the raise interrupts the blocking read directly — no reader threads,
+    # polls or flags. Note for future work on this file: CRuby 4.0 (M:N
+    # threads) here does not execute traps while the main thread is in
+    # Thread#join, defers them with another thread blocked on IO, and does
+    # not wake IO.select on pipe data — the raise-in-trap approach avoids
+    # all of it.
     #
     # @return [Integer] pi exit code (128+signal if pi was killed by a signal)
     def run
       cmd = [@command, "--mode", MODE, *@flags, @prompt]
       out_r, out_w = IO.pipe
-      pid = Process.spawn(*cmd, out: out_w, err: $stderr)
+      @pid = Process.spawn(*cmd, out: out_w, err: $stderr, pgroup: true)
       out_w.close
+      debug("spawned pid=#{@pid} (own group)")
 
       begin
-        out_r.set_encoding(Encoding::UTF_8)
-        out_r.each_line { |line| handle_line(line) }
+        read_pi_stream(out_r)
+      rescue Letsdo::Stopped
+        # The signal handler already sent SIGTERM to the pi group; make sure
+        # it is gone (grace loop here runs in the main context, not a trap)
+        # and reap it before propagating the stop.
+        debug("stopped by signal, terminating pi")
+        terminate
+        status = wait_status(@pid)
+        @streamer.finish
+        raise
       ensure
-        out_r.close
+        begin
+          out_r.close
+        rescue IOError
+          nil
+        end
         flush_pending_tools
       end
 
-      status = wait_status(pid)
+      status = wait_status(@pid)
       @streamer.finish
+      debug("exit status=#{status.inspect} code=#{exit_code(status)}")
       exit_code(status)
+    ensure
+      @pid = nil
+    end
+
+    def debug(message)
+      warn("[letsdo] pi: #{message}") if @debug
+    end
+
+    # One-shot SIGTERM to the pi process group for a signal handler: no
+    # waits, sleeps or IO — safe inside a trap. The caller reaps the child
+    # afterwards (see #run).
+    def terminate_now
+      pid = @pid
+      send_signal("TERM", pid) if pid
+    end
+
+    # Stops a running pi: SIGTERM to its process group, then SIGKILL after
+    # the grace period if it did not exit. Safe to call when the run already
+    # finished (no-op).
+    #
+    # @param signal [String] the first signal to send
+    # @param grace [Float] seconds to wait before falling back to SIGKILL
+    def terminate(signal: "TERM", grace: 3.0, tick: 0.05)
+      pid = @pid
+      return true unless pid
+
+      send_signal(signal, pid)
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + grace
+      loop do
+        break unless alive?(pid)
+
+        if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+          send_signal("KILL", pid)
+          break
+        end
+        sleep(tick)
+      end
+      true
     end
 
     private
+
+    # Reads the pi event stream until EOF. Runs on the main thread; a stop
+    # signal interrupts it via Letsdo::Stopped raised from the trap.
+    def read_pi_stream(out_r)
+      out_r.each_line { |line| handle_line(line) }
+      debug("stream: EOF")
+    end
 
     # Parses one line of the pi event stream and passes it to the streamer.
     def handle_line(line)
@@ -159,6 +233,22 @@ module Letsdo
     def wait_status(pid)
       _, status = Process.wait2(pid)
       status
+    end
+
+    # Sends a signal to the pi process group. Missing/killed groups are
+    # silently ignored.
+    def send_signal(signal, pid)
+      Process.kill(signal, -pid)
+    rescue Errno::ESRCH, Errno::EPERM
+      nil
+    end
+
+    # Whether the pi process still exists (does not reap it).
+    def alive?(pid)
+      Process.kill(0, pid)
+      true
+    rescue Errno::ESRCH, Errno::EPERM
+      false
     end
 
     def exit_code(status)

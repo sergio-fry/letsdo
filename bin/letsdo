@@ -5,19 +5,25 @@
 # letsdo — a local agent worker for Backlog.md/markdown tasks.
 #
 # A thin wrapper over Letsdo::CLI: runs an agent by name (prompt from
-# agents/<name>.md in the project root) through pi, or prints version/usage.
+# agents/<name>.md in the project root) as an orchestrator loop — all open
+# tasks assigned to the agent are done one after another (one agent run =
+# one task), then the loop waits for new ones until stopped with
+# SIGINT/SIGTERM (clean exit, code 0).
 #
 # Usage:
-#   ./bin/letsdo <name>    # run the <name> agent (pi exit code)
+#   ./bin/letsdo <name>    # run the <name> agent in the loop (exit 0 on stop)
 #   ./bin/letsdo --version # version, exit 0
 #   ./bin/letsdo --help    # help, exit 0
 #   ./bin/letsdo           # usage and agent list, exit 1
 #   ./bin/letsdo --badopt  # "unknown option" + usage, exit 1
 #
 # Environment:
-#   LETSDO_ROOT       project root with agents/ (default — current folder)
-#   LETSDO_PI_FLAGS   extra pi flags (e.g. "--model anthropic/claude-sonnet-4-5")
-#   AGENT_PI_FLAGS    the same, for bin/agent compatibility if LETSDO_PI_FLAGS is unset
+#   LETSDO_ROOT             project root with agents/ (default — current folder)
+#   LETSDO_PI_FLAGS         extra pi flags (e.g. "--model anthropic/claude-sonnet-4-5")
+#   AGENT_PI_FLAGS          the same, for bin/agent compatibility if LETSDO_PI_FLAGS is unset
+#   AGENT_ASSIGNEE_HANDLE   the agent's backlog assignee handle (default "@<name>")
+#   LETSDO_WAIT_SECONDS     retry interval when no tasks are open (default 10)
+#   LETSDO_BACKLOG_COMMAND  the backlog CLI command (default "backlog")
 #
 # A new agent = a new agents/<name>.md file, no code changes needed.
 #

@@ -1,0 +1,83 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+#
+# Fake backlog CLI for Letsdo::BacklogTasks / Letsdo::AgentLoop / Letsdo::CLI
+# tests.
+#
+# Behaves like `backlog task list --assignee <handle> --exclude-status Done
+# --json` for deterministic scenarios:
+#   - accepts the same arguments after the command name;
+#   - writes the same versioned JSON shape ({schemaVersion, kind, tasks});
+#   - by default exits with code 0.
+#
+# Control (via the environment):
+#   FAKE_BACKLOG_JSON        path: if set, the JSON printed here is written
+#                            to this file instead of stdout (for content
+#                            inspection and invalid JSON injection).
+#   FAKE_BACKLOG_ARGV_FILE   path: if set, ARGV.join("|") is written there —
+#                            to check the arguments (assignee, exclude, json).
+#   FAKE_BACKLOG_SCENARIO    output:
+#                            open      — <count> open tasks (default 2);
+#                            empty     — no tasks;
+#                            fail      — exit 1 with an error on stderr;
+#                            malformed — stdout is not JSON.
+#   FAKE_BACKLOG_COUNT       number of tasks in the open scenario (default 2).
+#   FAKE_BACKLOG_DONE_FILE   path: if the file exists, the open scenario
+#                            turns into empty — tasks were already served
+#                            once (for "N tasks → N runs, then wait" loops).
+#
+
+require "json"
+
+if (argv_file = ENV["FAKE_BACKLOG_ARGV_FILE"])
+  File.open(argv_file, "a") { |file| file.puts(ARGV.join("|")) }
+end
+
+scenario = ENV.fetch("FAKE_BACKLOG_SCENARIO", "open")
+count = Integer(ENV.fetch("FAKE_BACKLOG_COUNT", "2"))
+
+titles = %w[Alpha Beta Gamma Delta Epsilon]
+
+# Tasks were already served once → the loop should now see none and wait.
+if (done_file = ENV["FAKE_BACKLOG_DONE_FILE"])
+  if File.exist?(done_file)
+    scenario = "empty"
+  else
+    File.write(done_file, "done")
+  end
+end
+
+tasks = case scenario
+        when "open", ""
+          (1..count).map do |i|
+            {
+              "id" => "TASK-#{i}",
+              "title" => titles[(i - 1) % titles.length],
+              "status" => "To Do",
+              "priority" => nil,
+              "assignees" => ["@developer"]
+            }
+          end
+        when "empty"
+          []
+        when "fail"
+          warn "backlog: boom"
+          exit 1
+        when "malformed"
+          warn "backlog: malformed"
+          exit 0
+        else
+          warn "Unknown FAKE_BACKLOG_SCENARIO: #{scenario}"
+          exit 2
+        end
+
+output = JSON.generate({ "schemaVersion" => 1, "kind" => "task-list", "tasks" => tasks })
+
+if (json_file = ENV["FAKE_BACKLOG_JSON"])
+  File.write(json_file, output)
+else
+  puts(scenario == "malformed" ? "this is not json" : output)
+end
+
+exit 0

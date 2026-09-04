@@ -118,4 +118,28 @@ class PiRunnerTest < Minitest::Test
     assert_includes @err.string, "⚙ bash"
     refute_includes @err.string, "⚙ bash:"
   end
+
+  def test_terminate_stops_a_running_pi
+    runner = Letsdo::PiRunner.new(prompt: "You are an agent", streamer: @streamer, command: fake_pi)
+    old_sleep = ENV["FAKE_PI_SLEEP"]
+    ENV["FAKE_PI_SLEEP"] = "300"
+    result = nil
+    thread = Thread.new { result = runner.run }
+    begin
+      sleep 0.3
+      runner.terminate
+      thread.join(10)
+      refute thread.alive?, "terminate did not stop the run"
+      # The fake pi was killed by SIGTERM → 128 + 15.
+      assert_equal 143, result
+    ensure
+      ENV["FAKE_PI_SLEEP"] = old_sleep
+    end
+  end
+
+  def test_terminate_when_run_finished_is_a_noop
+    runner = Letsdo::PiRunner.new(prompt: "You are an agent", streamer: @streamer, command: fake_pi)
+    assert_equal 0, runner.run
+    refute_nil runner.terminate
+  end
 end
