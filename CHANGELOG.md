@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `letsdo <name> --init` (and the flag-first form `letsdo --init <name>`)
+  creates `agents/<name>.md` with the starter default prompt
+  (`Letsdo::DefaultPrompt::TEXT`) so the prompt can be customized — the
+  agent is never started. An already existing file or an unsafe name
+  (contains `/` or `\`, or is `.`/`..`) is refused with a message on
+  stderr and exit 1; nothing is ever written outside `agents/`
+  (`Letsdo::PromptStore#create_agent`).
 - Built-in default prompt (`Letsdo::DefaultPrompt::TEXT`): `letsdo <name>`
   starts the agent even without `agents/<name>.md` — the run falls back to
   the built-in process-only prompt, and letsdo announces once on stderr

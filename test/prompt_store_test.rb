@@ -60,4 +60,70 @@ class PromptStoreTest < Minitest::Test
       assert_match %r{/agents/nosuch\.md\z}, Letsdo::PromptStore.new(root: root).agent_path('nosuch')
     end
   end
+
+  def test_create_agent_writes_exact_content
+    with_empty_project do |root|
+      store = Letsdo::PromptStore.new(root: root)
+
+      assert store.create_agent('developer', 'You are a developer.')
+      assert_equal 'You are a developer.', store.read('developer')
+    end
+  end
+
+  def test_create_agent_writes_exactly_the_default_prompt
+    with_empty_project do |root|
+      store = Letsdo::PromptStore.new(root: root)
+
+      assert store.create_agent('developer', Letsdo::DefaultPrompt::TEXT)
+      assert_equal Letsdo::DefaultPrompt::TEXT, store.read('developer')
+    end
+  end
+
+  def test_create_agent_creates_the_agents_dir
+    with_empty_project do |root|
+      store = Letsdo::PromptStore.new(root: root)
+
+      refute File.directory?(File.join(root, 'agents'))
+      assert store.create_agent('developer', 'x')
+      assert_equal ['developer'], store.list
+    end
+  end
+
+  def test_create_agent_refuses_an_existing_file_without_overwriting
+    with_project('developer' => 'original') do |root|
+      store = Letsdo::PromptStore.new(root: root)
+
+      refute store.create_agent('developer', 'replacement')
+      assert_equal 'original', store.read('developer')
+    end
+  end
+
+  def test_create_agent_refuses_unsafe_names_and_writes_nothing
+    ['a/b', 'a\\b', '../x', '.', '..'].each do |name|
+      with_empty_project do |root|
+        store = Letsdo::PromptStore.new(root: root)
+
+        refute store.create_agent(name, 'x'), "expected #{name.inspect} to be refused"
+        assert_empty Dir.glob(File.join(root, '**', '*.md')), "#{name.inspect} created a file"
+      end
+    end
+  end
+
+  def test_create_agent_never_writes_outside_agents
+    with_empty_project do |root|
+      store = Letsdo::PromptStore.new(root: root)
+
+      refute store.create_agent('../escape', 'x')
+      refute File.exist?(File.join(root, 'escape.md'))
+    end
+  end
+
+  def test_unsafe_name_predicate
+    %w[a/b a\\b . ..].each do |name|
+      assert Letsdo::PromptStore.unsafe_name?(name), "#{name.inspect} should be unsafe"
+    end
+    %w[developer agent-1 name.md].each do |name|
+      refute Letsdo::PromptStore.unsafe_name?(name), "#{name.inspect} should be safe"
+    end
+  end
 end

@@ -2,6 +2,7 @@
 
 require 'shellwords'
 require_relative 'cli/launch'
+require_relative 'cli/init'
 
 module Letsdo
   # Command-line argument parsing and running an agent orchestrator loop.
@@ -15,9 +16,13 @@ module Letsdo
   #   letsdo <name> (no prompt)    — same, but on the built-in default prompt;
   #                                    one-time notification on stderr
   #                                    (path checked + 'letsdo <name> --init' hint);
+  #   letsdo <name> --init         — create agents/<name>.md with the starter
+  #                                    default prompt, never runs the agent;
+  #   letsdo --init <name>         — same, flag-first form;
   #   letsdo <unknown option>      — "letsdo: unknown option: X" + usage, exit 1.
   class CLI
     include CLILaunch
+    include CLIInit
 
     USAGE = 'Usage: letsdo <agent_name>'
     AGENTS_HEADER = 'Available agents:'
@@ -43,6 +48,7 @@ module Letsdo
       return print_version if version_flag?(arg)
       return print_help if help_flag?(arg)
       return usage_error if arg.nil?
+      return init_command(argv) if argv.include?('--init')
       return unknown_option(arg) if arg.start_with?('-')
 
       run_agent(arg)

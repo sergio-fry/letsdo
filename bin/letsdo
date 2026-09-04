@@ -11,14 +11,19 @@
 # agents/<name>.md in the project root; when that file is missing the agent
 # still starts on the built-in default prompt (Letsdo::DefaultPrompt) and a
 # one-time notification is printed on stderr naming the looked-up path and
-# the 'letsdo <name> --init' hint.
+# the 'letsdo <name> --init' hint. --init creates agents/<name>.md with the
+# starter default prompt (letsdo itself never runs the agent in that case,
+# so the prompt can be customized before the first run).
 #
 # Usage:
-#   ./bin/letsdo <name>    # run the <name> agent in the loop (exit 0 on stop)
-#   ./bin/letsdo --version # version, exit 0
-#   ./bin/letsdo --help    # help, exit 0
-#   ./bin/letsdo           # usage and agent list, exit 1
-#   ./bin/letsdo --badopt  # "unknown option" + usage, exit 1
+#   ./bin/letsdo <name>       # run the <name> agent in the loop (exit 0 on stop)
+#   ./bin/letsdo <name> --init # create agents/<name>.md with the starter
+#                               #   default prompt, never run the agent (exit 0)
+#   ./bin/letsdo --init <name>  # same, flag-first form
+#   ./bin/letsdo --version    # version, exit 0
+#   ./bin/letsdo --help       # help, exit 0
+#   ./bin/letsdo              # usage and agent list, exit 1
+#   ./bin/letsdo --badopt     # "unknown option" + usage, exit 1
 #
 # Environment:
 #   LETSDO_ROOT             project root with agents/ (default — current folder)

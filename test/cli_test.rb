@@ -367,3 +367,95 @@ class CliTuiTest < CliTest
     assert_includes tty_out.string, "\e[?1049l"
   end
 end
+
+# --init scaffold command (TASK-44): creates agents/<name>.md with the
+# starter default prompt, never runs the agent.
+class CliInitTest < CliTest
+  # Runs the CLI and yields (exit_code, root) while the temp project is
+  # still alive — file assertions must happen inside the block.
+  def with_run_init(argv, prompts: {}, env: {}, sleeper: nil)
+    with_project(prompts) do |root|
+      code = Letsdo::CLI.run(argv, env: env.merge('LETSDO_ROOT' => root),
+                                   stdout: @out, stderr: @err, sleeper: sleeper)
+      yield code, root
+    end
+  end
+
+  def prompt_file(root, name)
+    File.join(root, 'agents', "#{name}.md")
+  end
+
+  def test_init_creates_the_prompt_file_name_first
+    with_run_init(['developer', '--init']) do |code, root|
+      assert_equal 0, code
+      assert_equal Letsdo::DefaultPrompt::TEXT, File.read(prompt_file(root, 'developer'))
+      assert_equal "created #{File.join(File.expand_path(root), 'agents', 'developer.md')}\n",
+                   @out.string
+      assert_empty @err.string
+    end
+  end
+
+  def test_init_flag_first_form_behaves_identically
+    with_run_init(['--init', 'developer']) do |code, root|
+      assert_equal 0, code
+      assert_equal Letsdo::DefaultPrompt::TEXT, File.read(prompt_file(root, 'developer'))
+      assert_equal "created #{File.join(File.expand_path(root), 'agents', 'developer.md')}\n",
+                   @out.string
+      assert_empty @err.string
+    end
+  end
+
+  def test_init_does_not_spawn_pi
+    with_argv_file('FAKE_PI_ARGV_FILE') do |path|
+      with_run_init(['developer', '--init'], env: { 'FAKE_PI_ARGV_FILE' => path }) do |code,|
+        assert_equal 0, code
+        assert_empty File.read(path)
+      end
+    end
+  end
+
+  def test_init_never_overwrites_an_existing_file
+    with_run_init(['developer', '--init'], prompts: { 'developer' => 'custom prompt' }) do |code, root|
+      assert_equal 1, code
+      assert_equal 'custom prompt', File.read(prompt_file(root, 'developer'))
+      assert_includes @err.string, "letsdo: agents/developer.md already exists\n"
+      assert_empty @out.string
+    end
+  end
+
+  # Runs 'letsdo <name> --init' and asserts the scaffold is refused:
+  # exit 1, "letsdo: invalid agent name: <name>" on stderr and no file
+  # created anywhere (path-safety).
+  def refute_init_creates(name)
+    out = StringIO.new
+    err = StringIO.new
+    with_project({}) do |root|
+      code = Letsdo::CLI.run([name, '--init'], env: { 'LETSDO_ROOT' => root },
+                                               stdout: out, stderr: err)
+      assert_equal 1, code, "#{name.inspect} should exit 1"
+      assert_includes err.string, "letsdo: invalid agent name: #{name}\n"
+      assert_empty Dir.glob(File.join(root, '**', '*.md')), "#{name.inspect} created a file"
+    end
+  end
+
+  def test_init_refuses_unsafe_names
+    %w[a/b a\\b ../x . ..].each { |name| refute_init_creates(name) }
+  end
+
+  def test_init_without_a_name_prints_usage
+    with_run_init(['--init']) do |code,|
+      assert_equal 1, code
+      assert_includes @err.string, 'Usage: letsdo <agent_name>'
+    end
+  end
+
+  def test_plain_name_run_does_not_trigger_init
+    env = fake_backlog_env(scenario: 'empty', extra: { 'LETSDO_PI_COMMAND' => fake_pi })
+    with_run_init(['developer'], prompts: { 'developer' => 'You are a developer.' },
+                                 env: env, sleeper: stop_on_first_wait) do |code, root|
+      assert_equal 0, code
+      assert_equal 'You are a developer.', File.read(prompt_file(root, 'developer'))
+      refute_includes @out.string, 'created '
+    end
+  end
+end

@@ -1,10 +1,22 @@
 # frozen_string_literal: true
 
+require 'fileutils'
+
 module Letsdo
   # Access to agent prompts: the agents/<name>.md directory in the project
   # root. A new agent = a new agents/<name>.md file, no code changes needed.
   class PromptStore
     AGENTS_DIR = 'agents'
+
+    # Whether a name may be used as an agent prompt file name. Refuses
+    # path separators (no writes outside agents/ via traversal) and the
+    # dot names. Shared by create_agent and the CLI so both agree.
+    #
+    # @param name [String] agent name
+    # @return [Boolean]
+    def self.unsafe_name?(name)
+      name == '.' || name == '..' || name.match?(%r{[/\\]})
+    end
 
     # @param root [String] project root (agents/ lives there)
     def initialize(root:)
@@ -37,6 +49,24 @@ module Letsdo
     # @return [String] <root>/agents/<name>.md (resolved to an absolute path)
     def agent_path(name)
       File.expand_path(File.join(agents_dir, "#{name}.md"))
+    end
+
+    # Creates agents/<name>.md with the given content. Never raises and
+    # never writes anything when the file already exists or the name is
+    # unsafe (contains "/" or "\\", or is "."/"..") — returns false in
+    # both cases. Otherwise mkdir_p the agents/ dir, writes the content
+    # and returns true. Creation always stays inside agents/.
+    #
+    # @param name [String] agent name (also the would-be file name)
+    # @param content [String] prompt text to write
+    # @return [Boolean] true when the file was created, false otherwise
+    def create_agent(name, content)
+      return false if self.class.unsafe_name?(name)
+      return false if File.exist?(agent_path(name))
+
+      FileUtils.mkdir_p(agents_dir)
+      File.write(agent_path(name), content)
+      true
     end
 
     private
