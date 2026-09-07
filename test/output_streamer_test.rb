@@ -65,6 +65,29 @@ class OutputStreamerTextTest < OutputStreamerTest
 
     assert_empty @out.string
   end
+
+  def test_multiline_text_has_no_blank_lines
+    # The real pi emits each line's newline as its own delta.
+    @streamer.text_delta('alpha')
+    @streamer.text_delta("\n")
+    @streamer.text_delta('beta')
+    @streamer.text_delta("\n")
+    @streamer.text_delta('gamma')
+    @streamer.finish
+
+    assert_equal "alpha\nbeta\ngamma\n", @out.string
+  end
+
+  def test_finish_after_tool_only_run_does_not_add_blank_line
+    @streamer.text_delta('answer')
+    @streamer.finish
+    # A later run with no answer text must not add a second newline.
+    @streamer.tool_start('bash', args: { 'command' => 'ls' })
+    @streamer.tool_result('bash')
+    @streamer.finish
+
+    assert_equal "answer\n", @out.string
+  end
 end
 
 # Tool start lines: name, args, truncation.
@@ -246,5 +269,18 @@ class OutputStreamerLogTargetTest < OutputStreamerTest
     streamer.finish
 
     assert_equal ['no trailing newline'], log.lines.first
+  end
+
+  def test_log_target_multiline_text_has_no_blank_lines
+    log = Letsdo::Tui::LogBuffer.new
+    streamer = Letsdo::OutputStreamer.new(log: log, clock: -> { @now })
+    streamer.text_delta('alpha')
+    streamer.text_delta("\n")
+    streamer.text_delta('beta')
+    streamer.text_delta("\n")
+    streamer.text_delta('gamma')
+    streamer.finish
+
+    assert_equal %w[alpha beta gamma], log.lines.first
   end
 end

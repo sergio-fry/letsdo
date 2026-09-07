@@ -37,10 +37,14 @@ module Letsdo
     end
 
     def finish
-      return unless @last_char && @last_char != "\n"
-
-      text_sink.write("\n")
-      text_sink.flush unless @log
+      if @last_char && @last_char != "\n"
+        text_sink.write("\n")
+        text_sink.flush unless @log
+      end
+      # Reset so the next run's finish is a no-op unless new text arrived —
+      # otherwise a tool-only run after a text run writes a spurious blank
+      # line (TASK-77).
+      @last_char = nil
     end
 
     private
