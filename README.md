@@ -99,14 +99,14 @@ The gem is built from the repository:
 git clone git@github.com:sergio-fry/letsdo.git
 cd letsdo
 gem build letsdo.gemspec
-gem install letsdo-0.2.0.gem
+gem install letsdo-0.3.0.gem
 ```
 
 > **Ruby 4.0.x note.** Some Ruby 4.0.x builds ship default gems out of sync —
 > rdoc 8.0.0 declares `rbs >= 4.0.0` while rbs 3.x is bundled — so the
 > post-install RDoc hook can raise `Gem::ConflictError` even though the gem
 > files are already installed. Install without documentation to skip the
-> hook (`gem install letsdo-0.2.0.gem --no-document`), or install a matching
+> hook (`gem install letsdo-0.3.0.gem --no-document`), or install a matching
 > rbs first (`gem install rbs -v '>= 4.0.0'`).
 
 or run it straight from the checkout without installing:

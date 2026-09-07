@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-07
+
 ### Added
 
 - `Letsdo::Watcher` — OS file-change watching of the backlog folder via
@@ -25,6 +27,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Letsdo::Capture` runs its child in its own process group and terminates
   the whole group when the capture is interrupted, so a stopped capture can
   no longer leave an orphaned grandchild holding the stdout/stderr pipes.
+- Quitting the TUI no longer leaves the terminal in raw mode: raw-mode entry
+  moved to the main thread, so the saved termios (echo + canonical line
+  editing) is restored on every quit path — the shell in a tmux pane stays
+  usable.
+- A tool-only agent run after a text run no longer writes a spurious blank
+  line on stdout (`OutputStreamer#finish` resets its last-char state).
+- `require "letsdo"` no longer eagerly loads `tty-cursor` (or any tty-* gem),
+  so `rake test` runs on a clean Ruby without the gem installed; the TUI
+  still loads its gems lazily on the interactive path.
+- Documented a Ruby 4.0.x install note: the post-install RDoc hook can crash
+  on a mismatched rdoc/rbs pair — install with `--no-document`.
 
 ## [0.2.0] - 2026-09-04
 
@@ -94,6 +107,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Minitest tests; CI (GitHub Actions) builds the gem and runs tests on every push.
 - Local executable `letsdo`.
 
-[Unreleased]: https://github.com/sergio-fry/letsdo/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/sergio-fry/letsdo/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/sergio-fry/letsdo/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sergio-fry/letsdo/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/sergio-fry/letsdo/releases/tag/v0.1.0
