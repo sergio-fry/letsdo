@@ -2,8 +2,11 @@
 #
 # Runs on every push to any branch:
 #   1. Build check: the gem assembles cleanly (gem build letsdo.gemspec).
-#   2. Tests: rake test ends with 0 failures, 0 errors.
-#   3. Style: default RuboCop over lib/, bin/, test/ — the job fails on
+#   2. Install check: the built gem installs and `letsdo --version` runs.
+#      `--no-document` skips the RDoc post-install hook, which can crash on
+#      Ruby 4.x where the default rdoc/rbs gems are out of sync (TASK-80).
+#   3. Tests: rake test ends with 0 failures, 0 errors.
+#   4. Style: default RuboCop over lib/, bin/, test/ — the job fails on
 #      any offense. No project .rubocop.yml; the installed gem's defaults
 #      are used as-is.
 #
@@ -38,6 +41,11 @@ jobs:
       - name: Build gem
         run: gem build letsdo.gemspec
 
+      - name: Verify install
+        run: |
+          gem install ./letsdo-*.gem --no-document
+          letsdo --version
+
       - name: Run tests
         run: rake test
 
@@ -45,32 +53,3 @@ jobs:
         run: |
           gem install rubocop -v '~> 1.77.0'
           rubocop --no-server lib bin test
-
-
-on:
-  push:
-    branches:
-      - "**"
-
-jobs:
-  ci:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        # Explicit Ruby 3.x — satisfies letsdo.gemspec
-        # required_ruby_version: ">= 3.0".
-        ruby: ["3.3"]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: ${{ matrix.ruby }}
-
-      - name: Build gem
-        run: gem build letsdo.gemspec
-
-      - name: Run tests
-        run: rake test
