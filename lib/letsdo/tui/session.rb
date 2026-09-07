@@ -25,14 +25,20 @@ module Letsdo
       def run(&work)
         install_winch_handler
         @terminal.enter
-        start_input_thread
-        work.call
+        run_work(&work)
       rescue Letsdo::Stopped
         0
       ensure
         stop_input_thread
         leave_terminal
         restore_winch_handler
+      end
+
+      def run_work(&work)
+        with_raw_input do
+          start_input_thread
+          work.call
+        end
       end
 
       private
@@ -68,6 +74,10 @@ module Letsdo
         @input_thread = nil
       end
 
+      # Enters raw mode on the keyboard for the duration of the block. Held
+      # by the main thread (not the killable input thread) so the terminal
+      # state is restored on every quit path — a killed input thread would
+      # leave the shared tty in raw mode and break the calling shell (TASK-83).
       def with_raw_input(&block)
         if @input.stdin.tty? && @input.stdin.respond_to?(:raw)
           @input.stdin.raw(&block)

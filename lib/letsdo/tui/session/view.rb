@@ -7,11 +7,9 @@ module Letsdo
       private
 
       def input_loop
-        with_raw_input do
-          repaint
-          @last_repaint = @clock.call
-          loop { break if @stop || !poll_once }
-        end
+        repaint
+        @last_repaint = @clock.call
+        loop { break if @stop || !poll_once }
       rescue StandardError
         nil
       end

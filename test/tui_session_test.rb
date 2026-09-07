@@ -313,3 +313,71 @@ class TuiSessionRefreshTest < TuiSessionTest
     assert_equal 5, @metrics.snapshot.left
   end
 end
+
+# A keyboard that reports tty? and counts raw-mode entry/exit, so a test can
+# assert the terminal state is restored after the session ends (TASK-83).
+class RawTrackingStdin
+  attr_reader :raw_enters, :raw_exits
+
+  def initialize
+    @raw_enters = 0
+    @raw_exits = 0
+  end
+
+  def tty?
+    true
+  end
+
+  def raw
+    @raw_enters += 1
+    yield
+  ensure
+    @raw_exits += 1
+  end
+end
+
+# An input that scripts keys and exposes the raw-tracking stdin.
+class ScriptedRawInput
+  KEY_BY_CHAR = { 'q' => :q, 'p' => :p }.freeze
+
+  attr_reader :stdin
+
+  def initialize(keys)
+    @stdin = RawTrackingStdin.new
+    @keys = keys.dup
+  end
+
+  def next_key
+    KEY_BY_CHAR[@keys.shift]
+  end
+end
+
+# Raw-mode lifecycle: the terminal is left in raw mode while the session
+# runs and restored on every quit path — key quit and a raised stop.
+class TuiSessionRawModeTest < TuiSessionTest
+  def run_raw_session(keys, &work)
+    @input = ScriptedRawInput.new(keys)
+    session = Letsdo::Tui::Session.new(
+      name: 'developer', handle: '@developer', log: @log, metrics: @metrics,
+      terminal: terminal, input: @input,
+      wait_seconds: 10, clock: -> { @clock }
+    )
+    session.run(&work)
+  end
+
+  def test_key_quit_restores_raw_mode
+    result = run_raw_session(['q']) { sleep 0.5 }
+
+    assert_equal 0, result
+    assert_equal 1, @input.stdin.raw_enters
+    assert_equal 1, @input.stdin.raw_exits
+  end
+
+  def test_signal_stop_restores_raw_mode
+    result = run_raw_session([]) { raise Letsdo::Stopped }
+
+    assert_equal 0, result
+    assert_equal 1, @input.stdin.raw_enters
+    assert_equal 1, @input.stdin.raw_exits
+  end
+end
