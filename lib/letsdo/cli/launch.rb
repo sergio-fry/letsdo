@@ -76,7 +76,12 @@ module Letsdo
       AgentLoop.new(name: name, handle: handle, agent: agent,
                     task_provider: -> { provider.call },
                     wait_seconds: wait_seconds, sleeper: @sleeper, stderr: opts[:stderr],
-                    metrics: opts[:metrics], pause_gate: opts[:pause_gate])
+                    metrics: opts[:metrics], pause_gate: opts[:pause_gate],
+                    watcher: backlog_watcher)
+    end
+
+    def backlog_watcher
+      Watcher.new(path: File.join(@root, 'backlog'), poll_seconds: wait_seconds)
     end
   end
 end

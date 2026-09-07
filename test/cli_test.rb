@@ -216,6 +216,16 @@ class CliRunTest < CliTest
     assert_equal '', @out.string
   end
 
+  def test_injected_sleeper_is_honored_with_the_backlog_watcher
+    # The CLI builds a default backlog watcher for the loop; an injected
+    # control/stop sleeper must still win over the watcher idle path so the
+    # loop stops instead of hanging in the watcher's wait (TASK-84).
+    code = run_developer(scenario: 'empty')
+
+    assert_equal 0, code
+    assert_includes @err.string, 'letsdo: no open tasks for developer'
+  end
+
   def test_missing_prompt_run_still_executes_tasks_with_default_prompt
     with_argv_file('FAKE_PI_ARGV_FILE') do |path|
       env = fake_backlog_env(scenario: 'open', count: 2, extra: { 'LETSDO_PI_COMMAND' => fake_pi })

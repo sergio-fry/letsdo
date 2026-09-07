@@ -26,7 +26,12 @@ module Letsdo
       @stderr.puts('letsdo: stopped')
       0
     ensure
+      close_watcher
       restore_signal_handlers
+    end
+
+    def close_watcher
+      @watcher&.close
     end
 
     def debug(message)
@@ -52,7 +57,15 @@ module Letsdo
       @metrics = opts[:metrics]
       @pause_gate = opts[:pause_gate]
       @debug = opts[:debug].nil? ? ENV['LETSDO_DEBUG'] == '1' : opts[:debug]
-      @sleeper = opts[:sleeper] || ->(seconds) { sleep(seconds) }
+      @watcher = opts[:watcher] || (Watcher.new(path: opts[:watch_path]) if opts[:watch_path])
+      # Precedence is deliberate: an explicitly injected sleeper always wins
+      # over the watcher idle path — tests inject a stop/control sleeper that
+      # must never be bypassed by a configured watcher (TASK-84).
+      @sleeper = opts[:sleeper] || watcher_sleeper || ->(seconds) { sleep(seconds) }
+    end
+
+    def watcher_sleeper
+      @watcher && ->(seconds) { @watcher.wait(seconds) }
     end
 
     def run_until_stopped

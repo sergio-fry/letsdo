@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Letsdo::Watcher` — OS file-change watching of the backlog folder via
+  inotify (Linux, through Fiddle with no external gem) with a self-pipe
+  polling fallback; the orchestrator loop now wakes on a backlog change
+  instead of waiting out the full `LETSDO_WAIT_SECONDS` interval. The wake
+  replaces the idle-phase wait only — the startup check and the re-check
+  after each finished task stay immediate provider queries.
+
+### Fixed
+
+- An explicitly injected control/stop sleeper is honored over the watcher
+  idle path, so a CLI test that injects a sleeper completes normally even
+  with the loop watcher enabled — `rake test` no longer hangs in an infinite
+  idle wait.
+- `Letsdo::Capture` runs its child in its own process group and terminates
+  the whole group when the capture is interrupted, so a stopped capture can
+  no longer leave an orphaned grandchild holding the stdout/stderr pipes.
+
 ## [0.2.0] - 2026-09-04
 
 ### Added

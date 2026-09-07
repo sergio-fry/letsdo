@@ -446,3 +446,60 @@ class AgentLoopPausedSignalTest < AgentLoopSignalTest
     Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
   end
 end
+
+# A fake watcher standing in for Letsdo::Watcher: records each idle wait and
+# runs an optional block in place of the real blocking wait.
+class AgentLoopRecordingWatcher
+  attr_reader :waits
+
+  def initialize(&on_wait)
+    @waits = []
+    @on_wait = on_wait
+  end
+
+  def wait(seconds)
+    @waits << seconds
+    @on_wait&.call(seconds)
+    :timeout
+  end
+
+  def close; end
+end
+
+# Watcher + sleeper coexistence (TASK-84): an explicitly injected sleeper is
+# honored and never overridden by the watcher idle path.
+class AgentLoopWatcherTest < AgentLoopTest
+  def build_watcher_loop(watcher:, sleeper: nil, **opts)
+    Letsdo::AgentLoop.new(
+      name: 'developer', handle: '@developer', watcher: watcher,
+      run_one: opts[:run_one] || ->(_task) { 0 },
+      task_provider: opts.fetch(:provider, -> { [] }),
+      wait_seconds: opts.fetch(:wait_seconds, 0.5),
+      sleeper: sleeper, stderr: StringIO.new
+    )
+  end
+
+  def test_injected_sleeper_wins_over_the_watcher
+    watcher = AgentLoopRecordingWatcher.new
+    sleeper_calls = []
+    sleeper = lambda do |_seconds|
+      sleeper_calls << :slept
+      throw Letsdo::AgentLoop::STOP
+    end
+    loop_obj = build_watcher_loop(watcher: watcher, sleeper: sleeper)
+
+    loop_obj.run
+
+    assert_equal [:slept], sleeper_calls
+    assert_empty watcher.waits, 'watcher idle path must not override the injected sleeper'
+  end
+
+  def test_watcher_provides_the_idle_wait_without_a_sleeper
+    watcher = AgentLoopRecordingWatcher.new { throw Letsdo::AgentLoop::STOP }
+    loop_obj = build_watcher_loop(watcher: watcher, wait_seconds: 1.5)
+
+    loop_obj.run
+
+    assert_equal [1.5], watcher.waits
+  end
+end

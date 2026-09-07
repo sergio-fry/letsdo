@@ -33,6 +33,7 @@ module Letsdo
       @err_w.close
       readers = [quiet_reader(@out_r), quiet_reader(@err_r)]
       status = wait_and_reap(@pid)
+      @reaped = true
       [readers[0].value, readers[1].value, status]
     ensure
       cleanup
@@ -41,7 +42,7 @@ module Letsdo
     private
 
     def spawn_child
-      opts = { out: @out_w, err: @err_w }
+      opts = { out: @out_w, err: @err_w, pgroup: true }
       opts[:chdir] = @chdir if @chdir
       Process.spawn(*@args, **opts)
     end
@@ -62,12 +63,26 @@ module Letsdo
       status
     end
 
-    # Reaps pid if the normal wait never ran (the wait was interrupted by a
-    # stop); a no-op when the child was already reaped.
-    def reattach_reaper(pid)
+    # Kills the child's process group and reaps it when the normal wait was
+    # interrupted (a stop raised into the main thread). Killing the whole
+    # group also terminates any grandchildren that inherited the child's
+    # stdout/stderr pipes, so none of them is left holding the pipes open
+    # (TASK-84). A no-op when the child was already reaped normally.
+    def terminate_and_reap(pid)
       return unless pid
 
-      Process.detach(pid)
+      kill_group(pid)
+      reap(pid)
+    end
+
+    def kill_group(pid)
+      Process.kill('TERM', -pid)
+    rescue Errno::ESRCH, Errno::EPERM
+      nil
+    end
+
+    def reap(pid)
+      Process.wait2(pid)
     rescue Errno::ECHILD
       nil
     end
@@ -77,7 +92,7 @@ module Letsdo
       close_quietly(@err_w)
       close_quietly(@out_r)
       close_quietly(@err_r)
-      reattach_reaper(@pid)
+      terminate_and_reap(@pid) unless @reaped
     end
 
     def close_quietly(io)
