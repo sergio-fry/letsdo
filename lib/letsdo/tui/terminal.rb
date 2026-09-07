@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require 'tty-cursor'
-
 module Letsdo
   module Tui
     # Thin wrapper over the terminal: alternate screen, cursor handling and
@@ -36,12 +34,12 @@ module Letsdo
 
       # Enters the alternate screen and hides the cursor.
       def enter
-        write(ENTER_ALT_SCREEN + TTY::Cursor.hide)
+        write(ENTER_ALT_SCREEN + cursor.hide)
       end
 
       # Shows the cursor and leaves the alternate screen.
       def leave
-        write(TTY::Cursor.show + LEAVE_ALT_SCREEN)
+        write(cursor.show + LEAVE_ALT_SCREEN)
       end
 
       # Repaints the whole frame: cursor to the top left, then the frame.
@@ -69,6 +67,14 @@ module Letsdo
       end
 
       private
+
+      # Loaded lazily (like tty-screen/tty-reader) so requiring letsdo on a
+      # clean Ruby loads no tty-* gems — only the interactive TTY path needs
+      # them (TASK-78).
+      def cursor
+        require 'tty-cursor' unless defined?(TTY::Cursor)
+        TTY::Cursor
+      end
 
       def write(text)
         @stream.write(text)

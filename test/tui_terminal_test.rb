@@ -2,6 +2,7 @@
 
 require_relative 'test_helper'
 require 'stringio'
+require 'rbconfig'
 
 class TuiTerminalTest < Minitest::Test
   def setup
@@ -54,5 +55,26 @@ class TuiTerminalTest < Minitest::Test
     terminal = Letsdo::Tui::Terminal.new(stream: StringIO.new, size_provider: -> { [nil, nil] })
 
     assert_equal [24, 80], terminal.size
+  end
+
+  # TASK-78 regression: requiring the terminal (and letsdo) must not eagerly
+  # load tty-cursor — the constant appears only when the TTY path is taken.
+  # A subprocess gives a fresh interpreter, so earlier tests can't have
+  # loaded the gem in-process.
+  def test_requiring_terminal_does_not_eagerly_load_tty_cursor
+    output = ruby_subprocess_output(<<~'RUBY')
+      require "letsdo/tui/terminal"
+      abort "eagerly loaded tty-cursor" if defined?(TTY::Cursor)
+      print "ok"
+    RUBY
+
+    assert_equal 'ok', output
+  end
+
+  private
+
+  def ruby_subprocess_output(code)
+    lib = File.expand_path('../lib', __dir__)
+    IO.popen([RbConfig.ruby, '-I', lib, '-e', code], err: %i[child out], &:read)
   end
 end
