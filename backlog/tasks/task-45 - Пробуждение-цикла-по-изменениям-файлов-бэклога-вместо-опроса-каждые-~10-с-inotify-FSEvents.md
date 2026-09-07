@@ -3,11 +3,11 @@ id: TASK-45
 title: >-
   Wake the loop on backlog file changes instead of polling every ~10 s
   (inotify/FSEvents)
-status: To Do
+status: Done
 assignee:
   - '@developer'
 created_date: '2026-09-03 21:17'
-updated_date: '2026-09-07 17:00'
+updated_date: '2026-09-07 19:37'
 labels: []
 dependencies:
   - TASK-39
@@ -30,14 +30,14 @@ Expected loop semantics (scope clarification, 2026-09-07): the wake mechanism ch
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 While idle the loop blocks on the OS mechanism (inotify on Linux; FSEvents/fallback on macOS) and wakes immediately on backlog/ file changes, without waiting for the 10-second interval
-- [ ] #2 After waking, tasks are re-checked: if open tasks exist — the agent picks one; if not — the loop waits again (the agent's own edits do not start the agent without open tasks)
-- [ ] #3 The fallback periodic polling (~10 s) is kept when the watch is unavailable (no inotify/FSEvents)
-- [ ] #4 SIGINT/SIGTERM response stays fast while idle (integration with the interruptible sleeper/self-pipe in Letsdo::AgentLoop)
-- [ ] #5 Backlog service directories (e.g. .locks) are excluded from the watch subscription
-- [ ] #6 Tests: deterministic wake-up on a backlog file change (injectable watcher), fallback polling, correct stop; rake test green (0 failures); rubocop 0 offenses
-- [ ] #7 Loop semantics preserved: startup queries the backlog immediately (no wait before the first check), and after a finished task the loop immediately re-checks and continues with further open tasks; the idle/wait phase is entered only when no open tasks remain
-- [ ] #8 The inotify/FSEvents wake replaces the idle-phase polling only: it adds no latency between consecutive tasks and does not delay the startup check (those remain immediate provider queries)
+- [x] #1 While idle the loop blocks on the OS mechanism (inotify on Linux; FSEvents/fallback on macOS) and wakes immediately on backlog/ file changes, without waiting for the 10-second interval
+- [x] #2 After waking, tasks are re-checked: if open tasks exist — the agent picks one; if not — the loop waits again (the agent's own edits do not start the agent without open tasks)
+- [x] #3 The fallback periodic polling (~10 s) is kept when the watch is unavailable (no inotify/FSEvents)
+- [x] #4 SIGINT/SIGTERM response stays fast while idle (integration with the interruptible sleeper/self-pipe in Letsdo::AgentLoop)
+- [x] #5 Backlog service directories (e.g. .locks) are excluded from the watch subscription
+- [x] #6 Tests: deterministic wake-up on a backlog file change (injectable watcher), fallback polling, correct stop; rake test green (0 failures); rubocop 0 offenses
+- [x] #7 Loop semantics preserved: startup queries the backlog immediately (no wait before the first check), and after a finished task the loop immediately re-checks and continues with further open tasks; the idle/wait phase is entered only when no open tasks remain
+- [x] #8 The inotify/FSEvents wake replaces the idle-phase polling only: it adds no latency between consecutive tasks and does not delay the startup check (those remain immediate provider queries)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -49,6 +49,12 @@ Expected loop semantics (scope clarification, 2026-09-07): the wake mechanism ch
 4. Wire Letsdo::CLILaunch: pass watcher watching <root>/backlog.
 5. Tests: watcher_test.rb (deterministic wake on a file change, excluded .locks, timeout, wake, fallback) + agent_loop_test.rb integration with an injectable fake watcher (wake-up re-checks and runs a task; fallback polling waits; correct stop). rake test green, rubocop 0 offenses.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implementation completed via TASK-84 (the bug fix that re-introduced the watcher correctly): Letsdo::Watcher (inotify via Fiddle + self-pipe polling fallback) is wired into AgentLoop with the correct sleeper precedence and into CLILaunch (default watcher on <root>/backlog).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
@@ -81,3 +87,9 @@ Problem found during verification: the default watcher made AgentLoop#idle_sleep
 Decision: implementation reverted (3 lib files restored to HEAD, watcher.rb removed) so the task can be re-attempted cleanly. The scope clarification in the description (immediate startup check + continue after each task; watcher replaces only the idle phase) remains valid guidance.
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Completed via TASK-84. Added Letsdo::Watcher (inotify via Fiddle, no external gem; self-pipe polling fallback) and wired it into AgentLoop with the correct sleeper precedence (an injected sleeper always wins over the watcher idle path) and into CLILaunch (default watcher on <root>/backlog); the wake replaces only the idle-phase wait — startup and after-task re-checks stay immediate provider queries (Loop unchanged). Verified with: watcher_test.rb (deterministic inotify wake on a file change, .locks excluded, timeout, wake, fallback polling), agent_loop_test.rb (injectable fake watcher + sleeper precedence + idle integration), existing loop/signal tests (startup/after-task semantics, fast SIGINT/SIGTERM); rake test 214 runs / 0 failures / 0 errors; rubocop 1.77.0 0 offenses.
+<!-- SECTION:FINAL_SUMMARY:END -->
