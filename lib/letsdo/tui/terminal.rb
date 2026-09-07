@@ -46,9 +46,18 @@ module Letsdo
 
       # Repaints the whole frame: cursor to the top left, then the frame.
       #
+      # Row separators are written as CRLF (\r\n), never bare LF. The TUI
+      # input thread holds stdin in io-console raw mode for the whole
+      # session, and raw mode clears OPOST on the shared tty — without it a
+      # bare \n no longer implies a carriage return, so every row after the
+      # first would start at the previous row's end column and the frame
+      # would wrap/scroll into the "blank activity pane" scramble (TASK-82).
+      # Explicit CRLF renders correctly both in raw mode and on terminals
+      # whose ONLCR already expands \n (a doubled CR is harmless).
+      #
       # @param frame [String] the rendered screen (see Letsdo::Tui::Renderer)
       def render(frame)
-        write(HOME + frame)
+        write(HOME + frame.gsub("\n", "\r\n"))
       end
 
       # The current terminal size.

@@ -29,6 +29,23 @@ class TuiTerminalTest < Minitest::Test
     assert_equal "\e[1;1Hframe", @stream.string
   end
 
+  # TASK-82 regression: the frame must reach the terminal with CRLF row
+  # separators. While stdin is held in io-console raw mode (the whole TUI
+  # session) OPOST is off on the shared tty, so a bare \n never returns the
+  # cursor to column 0 and every row after the first wraps — the reported
+  # "blank activity pane" (content flashes then clears).
+  def test_render_uses_crlf_row_separators
+    @terminal.render("head\nbody\ntail")
+
+    assert_equal "\e[1;1Hhead\r\nbody\r\ntail", @stream.string
+  end
+
+  def test_render_preserves_a_trailing_line_without_extra_newline
+    @terminal.render("one\ntwo")
+
+    refute_includes @stream.string, "two\n"
+  end
+
   def test_size_comes_from_the_provider
     assert_equal [24, 80], @terminal.size
   end

@@ -7,10 +7,11 @@ status: To Do
 assignee:
   - '@developer'
 created_date: '2026-09-03 21:17'
-updated_date: '2026-09-04 10:27'
+updated_date: '2026-09-07 11:56'
 labels: []
 dependencies:
   - TASK-39
+  - TASK-82
 priority: medium
 type: enhancement
 ordinal: 34000
@@ -31,3 +32,13 @@ Currently Letsdo::AgentLoop polls the backlog once every ~10 s (wait_seconds) wh
 - [ ] #5 Backlog service directories (e.g. .locks) are excluded from the watch subscription
 - [ ] #6 Tests: deterministic wake-up on a backlog file change (injectable watcher), fallback polling, correct stop; rake test green (0 failures); rubocop 0 offenses
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @developer
+created: 2026-09-07 11:56
+---
+Parked to To Do on user request (2026-09-07): critical TUI bug TASK-82 (blank activity pane — blocks using the current system) takes priority. No code changes for this task were present in the working tree. Resume implementation only after TASK-82 is resolved (dependency added).
+---
+<!-- COMMENTS:END -->
