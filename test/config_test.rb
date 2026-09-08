@@ -1,0 +1,91 @@
+# frozen_string_literal: true
+
+require_relative 'test_helper'
+
+# Letsdo::Config reads every LETSDO_*/AGENT_* variable with the defaults and
+# precedence that used to be spread across CLI, PiRunner and AgentLoop.
+class ConfigTest < Minitest::Test
+  def config(env)
+    Letsdo::Config.new(env: env)
+  end
+
+  def test_root_defaults_to_cwd
+    assert_equal Dir.pwd, config({}).root
+  end
+
+  def test_root_from_env
+    assert_equal '/tmp/x', config('LETSDO_ROOT' => '/tmp/x').root
+  end
+
+  def test_pi_flags_split_on_whitespace
+    assert_equal ['--model', 'm'], config('LETSDO_PI_FLAGS' => '--model m').pi_flags
+  end
+
+  def test_pi_flags_fall_back_to_agent_pi_flags
+    assert_equal ['--model', 'm'], config('AGENT_PI_FLAGS' => '--model m').pi_flags
+  end
+
+  def test_pi_flags_letsdo_wins_over_agent
+    assert_equal ['--a'], config('LETSDO_PI_FLAGS' => '--a', 'AGENT_PI_FLAGS' => '--b').pi_flags
+  end
+
+  def test_pi_flags_empty_when_unset
+    assert_equal [], config({}).pi_flags
+  end
+
+  def test_assignee_handle_defaults_to_name
+    assert_equal '@dev', config({}).assignee_handle('dev')
+  end
+
+  def test_assignee_handle_override
+    assert_equal '@x', config('AGENT_ASSIGNEE_HANDLE' => '@x').assignee_handle('dev')
+  end
+
+  def test_assignee_handle_blank_override_falls_back
+    assert_equal '@dev', config('AGENT_ASSIGNEE_HANDLE' => '   ').assignee_handle('dev')
+  end
+
+  def test_wait_seconds_defaults_to_ten
+    assert_equal 10.0, config({}).wait_seconds
+  end
+
+  def test_wait_seconds_from_env
+    assert_equal 3.5, config('LETSDO_WAIT_SECONDS' => '3.5').wait_seconds
+  end
+
+  def test_wait_seconds_fall_back_to_agent
+    assert_equal 4.0, config('AGENT_WAIT_SECONDS' => '4').wait_seconds
+  end
+
+  def test_wait_seconds_invalid_falls_back_to_default
+    assert_equal 10.0, config('LETSDO_WAIT_SECONDS' => 'not-a-number').wait_seconds
+  end
+
+  def test_pi_command_default
+    assert_equal 'pi', config({}).pi_command
+  end
+
+  def test_pi_command_override
+    assert_equal '/x/pi', config('LETSDO_PI_COMMAND' => '/x/pi').pi_command
+  end
+
+  def test_backlog_command_default
+    assert_equal 'backlog', config({}).backlog_command
+  end
+
+  def test_backlog_command_override
+    assert_equal 'bl', config('LETSDO_BACKLOG_COMMAND' => 'bl').backlog_command
+  end
+
+  def test_debug_disabled_by_default
+    refute config({}).debug?
+  end
+
+  def test_debug_enabled_by_one
+    assert config('LETSDO_DEBUG' => '1').debug?
+  end
+
+  def test_debug_disabled_for_other_values
+    refute config('LETSDO_DEBUG' => 'true').debug?
+  end
+end

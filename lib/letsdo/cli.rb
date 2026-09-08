@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require 'shellwords'
 require_relative 'cli/launch'
 require_relative 'cli/init'
 
@@ -26,7 +25,6 @@ module Letsdo
 
     USAGE = 'Usage: letsdo <agent_name>'
     AGENTS_HEADER = 'Available agents:'
-    DEFAULT_WAIT_SECONDS = 10.0
 
     def self.run(argv, **opts)
       new(env: opts.fetch(:env, ENV), stdout: opts.fetch(:stdout, $stdout),
@@ -40,7 +38,8 @@ module Letsdo
       @stderr = stderr
       @stdin = stdin
       @sleeper = sleeper
-      @root = env.fetch('LETSDO_ROOT', Dir.pwd)
+      @config = Config.new(env: env)
+      @root = @config.root
     end
 
     def run(argv)
@@ -104,26 +103,19 @@ module Letsdo
     end
 
     def assignee_handle(name)
-      env_handle = @env['AGENT_ASSIGNEE_HANDLE']
-      env_handle && !env_handle.strip.empty? ? env_handle : "@#{name}"
+      @config.assignee_handle(name)
     end
 
     def backlog_command
-      @env.fetch('LETSDO_BACKLOG_COMMAND', 'backlog')
+      @config.backlog_command
     end
 
     def wait_seconds
-      value = @env['LETSDO_WAIT_SECONDS'].to_s.strip
-      value = @env['AGENT_WAIT_SECONDS'].to_s.strip if value.empty?
-      return DEFAULT_WAIT_SECONDS if value.empty?
-
-      Float(value)
-    rescue ArgumentError, TypeError
-      DEFAULT_WAIT_SECONDS
+      @config.wait_seconds
     end
 
     def pi_command
-      @env.fetch('LETSDO_PI_COMMAND', PiRunner::COMMAND)
+      @config.pi_command
     end
 
     def print_usage(stream)
@@ -137,11 +129,7 @@ module Letsdo
     end
 
     def parse_pi_flags
-      value = @env['LETSDO_PI_FLAGS'].to_s
-      value = @env['AGENT_PI_FLAGS'].to_s if value.strip.empty?
-      return [] if value.strip.empty?
-
-      Shellwords.split(value)
+      @config.pi_flags
     end
   end
 end

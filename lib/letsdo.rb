@@ -22,6 +22,7 @@
 
 require_relative 'letsdo/version'
 require_relative 'letsdo/errors'
+require_relative 'letsdo/config'
 require_relative 'letsdo/prompt_store'
 require_relative 'letsdo/default_prompt'
 require_relative 'letsdo/output_streamer'

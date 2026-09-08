@@ -30,7 +30,7 @@ module Letsdo
       @command = opts.fetch(:command, COMMAND)
       @pending_tools = {}
       @reaped_status = nil
-      @debug = opts[:debug].nil? ? ENV['LETSDO_DEBUG'] == '1' : opts[:debug]
+      @debug = opts[:debug].nil? ? (opts[:config] || Config.new).debug? : opts[:debug]
     end
 
     def run

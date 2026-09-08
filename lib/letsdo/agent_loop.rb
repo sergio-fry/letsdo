@@ -56,12 +56,18 @@ module Letsdo
     def assign_control_opts(opts)
       @metrics = opts[:metrics]
       @pause_gate = opts[:pause_gate]
-      @debug = opts[:debug].nil? ? ENV['LETSDO_DEBUG'] == '1' : opts[:debug]
+      @debug = resolve_debug(opts)
       @watcher = opts[:watcher] || (Watcher.new(path: opts[:watch_path]) if opts[:watch_path])
       # Precedence is deliberate: an explicitly injected sleeper always wins
       # over the watcher idle path — tests inject a stop/control sleeper that
       # must never be bypassed by a configured watcher (TASK-84).
       @sleeper = opts[:sleeper] || watcher_sleeper || ->(seconds) { sleep(seconds) }
+    end
+
+    def resolve_debug(opts)
+      return opts[:debug] unless opts[:debug].nil?
+
+      (opts[:config] || Config.new).debug?
     end
 
     def watcher_sleeper
