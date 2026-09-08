@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The gemspec now has a user-facing description (what letsdo does and why)
+  instead of an internal class inventory; `required_ruby_version` is
+  narrowed from `>= 3.0` to `>= 3.3` to match what CI actually tests
+  (Ruby 3.0–3.2 are end-of-life); `bug_tracker_uri` and `documentation_uri`
+  metadata are added; and `spec.files` ships `CHANGELOG.md` and the gemspec
+  itself alongside the code, README and LICENSE.
+
 ### Fixed
 
 - The documented Ruby 4.0.x install workaround now leads with fixing the

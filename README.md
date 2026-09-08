@@ -80,7 +80,7 @@ generation, any repeatable task flow you can express as assignee + prompt.
 
 ## Requirements
 
-- Ruby **>= 3.0**.
+- Ruby **>= 3.3**.
 - The [pi](https://github.com/earendil-works/pi) agent CLI on
   `PATH` — this is the AI backend that runs the agent (`pi --mode json`).
   The command is configurable via `LETSDO_PI_COMMAND`.
@@ -258,7 +258,7 @@ gem build letsdo.gemspec
 
 Cleanliness is enforced by the CI workflow
 (`.github/workflows/ci.yml`): gem build + `rake test` on every push,
-Ruby 3.3 (satisfies `required_ruby_version: ">= 3.0"`).
+Ruby 3.3 and 4.0 (satisfies `required_ruby_version: ">= 3.3"`).
 
 ## Alternatives
 

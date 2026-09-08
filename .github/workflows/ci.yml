@@ -29,7 +29,7 @@ jobs:
     strategy:
       matrix:
         # Explicit Ruby 3.x and 4.x — satisfies letsdo.gemspec
-        # required_ruby_version: ">= 3.0". Ruby 4.0 covers the release
+        # required_ruby_version: ">= 3.3". Ruby 4.0 covers the release
         # where a partial gem update can leave rdoc/rbs out of sync
         # (TASK-80), so the plain install path is exercised there too.
         ruby: ["3.3", "4.0"]

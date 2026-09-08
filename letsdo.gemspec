@@ -9,14 +9,20 @@ Gem::Specification.new do |spec|
   spec.email   = ["udalov.x@mail.ru"]
 
   spec.summary     = "A local agent worker for Backlog.md/markdown tasks"
-  spec.description = "letsdo — a local agent worker for Backlog.md/markdown tasks. " \
-                     "OOP structure: Letsdo::PromptStore (agents/), Letsdo::OutputStreamer " \
-                     "and Letsdo::PiRunner (pi --mode json), Letsdo::Agent (one run), " \
-                     "Letsdo::Loop (orchestrator loop), Letsdo::CLI. Minitest tests. " \
-                     "Will later be split into a separate repository."
+  spec.description = "letsdo turns a plain markdown backlog into a team of " \
+                     "autonomous local agents. Each agent is just a prompt " \
+                     "file in agents/; run `letsdo <name>` and it works " \
+                     "through every open task assigned to that agent, one " \
+                     "task per run, and stops cleanly on Ctrl+C. No " \
+                     "framework, no hosted platform — the backlog folder is " \
+                     "the single source of truth and task data never leaves " \
+                     "your machine."
   spec.license = "MIT"
 
-  spec.required_ruby_version = ">= 3.0"
+  # Supported Ruby floor matches what CI actually tests (3.3 and 4.0).
+  # Ruby 3.0/3.1/3.2 are end-of-life, so claiming support for them while
+  # never testing them would be dishonest packaging.
+  spec.required_ruby_version = ">= 3.3"
 
   # Runtime dependencies: the interactive TUI. Required lazily inside the
   # tui classes so the plain line-stream mode (pipes/CI/tests) works with
@@ -31,20 +37,25 @@ Gem::Specification.new do |spec|
   # installs the same constraint with `gem install` on a clean Ruby.
   spec.add_development_dependency "rubocop", "~> 1.77.0"
 
-  # RubyGems resolves executables relative to bindir: the literal value
-  # "bin/letsdo" would make gem build look for bin/bin/letsdo. The canonical
-  # form: bindir="bin" + executables=["letsdo"] — the gem executable file
-  # is bin/letsdo, into PATH it goes as the letsdo command.
-  spec.files         = Dir["lib/**/*.rb", "README.md", "LICENSE"]
+  # The AI backend is the external `pi` CLI (default, overridable via
+  # LETSDO_PI_COMMAND) — a runtime *requirement*, not a rubygem, so it is
+  # documented in the README rather than declared as a dependency.
+  spec.files         = Dir["lib/**/*.rb", "README.md", "LICENSE",
+                           "CHANGELOG.md", "letsdo.gemspec"]
   spec.bindir        = "bin"
   spec.executables   = ["letsdo"]
   spec.require_paths = ["lib"]
 
   spec.homepage = "https://github.com/sergio-fry/letsdo"
 
-  spec.metadata["homepage_uri"]      = "https://github.com/sergio-fry/letsdo"
-  spec.metadata["source_code_uri"]   = "https://github.com/sergio-fry/letsdo"
-  spec.metadata["changelog_uri"]     = "https://github.com/sergio-fry/letsdo/blob/main/CHANGELOG.md"
+  # source_code_uri shares the homepage URL on purpose (the source *is* the
+  # project home); homepage_uri is deliberately not duplicated in metadata
+  # because an identical homepage_uri + source_code_uri pair makes
+  # `gem build` warn.
+  spec.metadata["source_code_uri"]       = "https://github.com/sergio-fry/letsdo"
+  spec.metadata["bug_tracker_uri"]       = "https://github.com/sergio-fry/letsdo/issues"
+  spec.metadata["changelog_uri"]         = "https://github.com/sergio-fry/letsdo/blob/main/CHANGELOG.md"
+  spec.metadata["documentation_uri"]     = "https://github.com/sergio-fry/letsdo/blob/main/README.md"
   spec.metadata["rubygems_mfa_required"] = "true"
-  spec.metadata["allowed_push_host"] = "https://rubygems.org"
+  spec.metadata["allowed_push_host"]     = "https://rubygems.org"
 end
