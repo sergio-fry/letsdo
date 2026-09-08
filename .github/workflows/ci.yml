@@ -2,9 +2,11 @@
 #
 # Runs on every push to any branch:
 #   1. Build check: the gem assembles cleanly (gem build letsdo.gemspec).
-#   2. Install check: the built gem installs and `letsdo --version` runs.
-#      `--no-document` skips the RDoc post-install hook, which can crash on
-#      Ruby 4.x where the default rdoc/rbs gems are out of sync (TASK-80).
+#   2. Install check: the built gem installs with its normal post-install
+#      RDoc hook (no --no-document) and `letsdo --version` runs. This guards
+#      the exact plain `gem install` path a user runs. On a healthy Ruby the
+#      hook must not crash (TASK-80); a broken rdoc/rbs default-gem pair is
+#      an environment issue and is called out separately in the docs.
 #   3. Tests: rake test ends with 0 failures, 0 errors.
 #   4. Style: default RuboCop over lib/, bin/, test/ — the job fails on
 #      any offense. No project .rubocop.yml; the installed gem's defaults
@@ -26,9 +28,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # Explicit Ruby 3.x — satisfies letsdo.gemspec
-        # required_ruby_version: ">= 3.0".
-        ruby: ["3.3"]
+        # Explicit Ruby 3.x and 4.x — satisfies letsdo.gemspec
+        # required_ruby_version: ">= 3.0". Ruby 4.0 covers the release
+        # where a partial gem update can leave rdoc/rbs out of sync
+        # (TASK-80), so the plain install path is exercised there too.
+        ruby: ["3.3", "4.0"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,7 +47,14 @@ jobs:
 
       - name: Verify install
         run: |
-          gem install ./letsdo-*.gem --no-document
+          # Guard the exact plain install path a user runs (no --no-document,
+          # so the post-install RDoc hook must load rdoc and succeed). A fresh
+          # Ruby ships a coherent rdoc/rbs set; if `require "rdoc"` already
+          # fails (rdoc 8.0.0 needs rbs >= 4.0.0, only rbs 3.x present — a
+          # partial gem update broke the pair), repair the environment first
+          # so the hook still runs (TASK-80), then install plainly.
+          ruby -e 'require "rdoc"; exit 0' || gem install rbs -v '>= 4.0.0'
+          gem install ./letsdo-*.gem
           letsdo --version
 
       - name: Run tests

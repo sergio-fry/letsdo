@@ -105,9 +105,10 @@ gem install letsdo-0.3.0.gem
 > **Ruby 4.0.x note.** Some Ruby 4.0.x builds ship default gems out of sync —
 > rdoc 8.0.0 declares `rbs >= 4.0.0` while rbs 3.x is bundled — so the
 > post-install RDoc hook can raise `Gem::ConflictError` even though the gem
-> files are already installed. Install without documentation to skip the
-> hook (`gem install letsdo-0.3.0.gem --no-document`), or install a matching
-> rbs first (`gem install rbs -v '>= 4.0.0'`).
+> files are already installed. Fix the environment by installing a matching
+> rbs first (`gem install rbs -v '>= 4.0.0'`); if that is not possible,
+> install the gem without documentation to skip the hook
+> (`gem install letsdo-0.3.0.gem --no-document`).
 
 or run it straight from the checkout without installing:
 

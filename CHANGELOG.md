@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The documented Ruby 4.0.x install workaround now leads with fixing the
+  environment (`gem install rbs -v '>= 4.0.0'`), with `--no-document` as a
+  fallback — the rbs upgrade actually makes the plain `gem install letsdo`
+  post-install RDoc hook succeed instead of just skipping it. The CI
+  "Verify install" step now installs the built gem without `--no-document`,
+  repairs a broken rdoc/rbs pair when `require "rdoc"` fails, runs on Ruby
+  4.0 as well as 3.3, and checks `letsdo --version` — so the exact plain
+  install path a user runs (including the RDoc hook) is guarded against the
+  rdoc/rbs conflict crashing it again.
+
 ## [0.3.0] - 2026-09-07
 
 ### Added
