@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-08
+
 ### Changed
 
+- `Letsdo::CLI::Builder` extracted from `CLI` — all component assembly
+  (agent, provider, loop, TUI setup) now lives in Builder; `CLI` keeps only
+  argv parsing and delegates to Builder. The former `CLILaunch` module is
+  deleted. New `test/cli_builder_test.rb` covers Builder assembly and TUI
+  detection. Zero behavioral change.
 - The gemspec now has a user-facing description (what letsdo does and why)
   instead of an internal class inventory; `required_ruby_version` is
   narrowed from `>= 3.0` to `>= 3.3` to match what CI actually tests
@@ -128,7 +135,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Minitest tests; CI (GitHub Actions) builds the gem and runs tests on every push.
 - Local executable `letsdo`.
 
-[Unreleased]: https://github.com/sergio-fry/letsdo/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/sergio-fry/letsdo/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/sergio-fry/letsdo/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/sergio-fry/letsdo/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sergio-fry/letsdo/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/sergio-fry/letsdo/releases/tag/v0.1.0
