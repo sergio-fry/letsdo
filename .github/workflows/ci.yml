@@ -28,11 +28,18 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # Explicit Ruby 3.x and 4.x — satisfies letsdo.gemspec
-        # required_ruby_version: ">= 3.3". Ruby 4.0 covers the release
+        # Every currently-supported Ruby major at its latest patch, verified
+        # against endoflife.date/ruby.json on 2026-09-10: 3.3 (latest
+        # 3.3.12), 3.4 (latest 3.4.10), 4.0 (latest 4.0.6). ruby/setup-ruby
+        # resolves each major to its latest patch release. EOL majors
+        # (3.0-3.2) are excluded; Ruby 3.5 was preview-only at that date, so
+        # it joins the matrix once it ships a stable supported branch. The
+        # floor is the gemspec's required_ruby_version ">= 3.3", and every
+        # matrix entry satisfies it, so a failing major signals raising the
+        # floor — never disable the job. Ruby 4.0 also covers the release
         # where a partial gem update can leave rdoc/rbs out of sync
         # (TASK-80), so the plain install path is exercised there too.
-        ruby: ["3.3", "4.0"]
+        ruby: ["3.3", "3.4", "4.0"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
