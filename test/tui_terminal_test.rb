@@ -7,7 +7,7 @@ require 'rbconfig'
 class TuiTerminalTest < Minitest::Test
   def setup
     @stream = StringIO.new
-    @terminal = Letsdo::Tui::Terminal.new(stream: @stream, size_provider: -> { [24, 80] })
+    @terminal = Letsdo::Tui::Terminal.new(stream: @stream, size_provider: size_provider(24, 80))
   end
 
   def test_enter_switches_to_the_alternate_screen_and_hides_cursor

@@ -4,6 +4,8 @@ require 'minitest/autorun'
 require 'tmpdir'
 require 'fileutils'
 require_relative '../lib/letsdo'
+require_relative 'helpers/fake_tty'
+require_relative 'helpers/tui'
 
 # Shared harness for the letsdo gem tests:
 #
@@ -74,5 +76,6 @@ end
 module Minitest
   class Test
     include LetsdoTestHelpers
+    include TuiTestHelpers
   end
 end

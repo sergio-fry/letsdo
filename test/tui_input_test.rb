@@ -9,13 +9,6 @@ require 'rbconfig'
 # A pipe (not StringIO) is required: tty-reader calls wait_readable
 # for multi-byte sequences, and StringIO does not implement it.
 class TuiInputTest < Minitest::Test
-  def input_for(bytes)
-    reader, writer = IO.pipe
-    writer.write(bytes)
-    writer.close
-    Letsdo::Tui::Input.new(stdin: reader, poll_timeout: 0)
-  end
-
   def test_decodes_arrow_keys
     assert_equal :up, input_for("\e[A").next_key
     assert_equal :down, input_for("\e[B").next_key

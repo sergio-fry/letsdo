@@ -24,14 +24,7 @@ class TuiSessionTest < Minitest::Test
   end
 
   def terminal
-    Letsdo::Tui::Terminal.new(stream: @terminal_io, size_provider: -> { [8, 60] })
-  end
-
-  def input_for(keys)
-    reader, writer = IO.pipe
-    writer.write(keys)
-    writer.close
-    Letsdo::Tui::Input.new(stdin: reader, poll_timeout: 0)
+    Letsdo::Tui::Terminal.new(stream: @terminal_io, size_provider: size_provider(8, 60))
   end
 
   # Runs a session over the given key script and work block.
@@ -311,44 +304,6 @@ class TuiSessionRefreshTest < TuiSessionTest
 
     assert_includes frames.last, 'left 5'
     assert_equal 5, @metrics.snapshot.left
-  end
-end
-
-# A keyboard that reports tty? and counts raw-mode entry/exit, so a test can
-# assert the terminal state is restored after the session ends (TASK-83).
-class RawTrackingStdin
-  attr_reader :raw_enters, :raw_exits
-
-  def initialize
-    @raw_enters = 0
-    @raw_exits = 0
-  end
-
-  def tty?
-    true
-  end
-
-  def raw
-    @raw_enters += 1
-    yield
-  ensure
-    @raw_exits += 1
-  end
-end
-
-# An input that scripts keys and exposes the raw-tracking stdin.
-class ScriptedRawInput
-  KEY_BY_CHAR = { 'q' => :q, 'p' => :p }.freeze
-
-  attr_reader :stdin
-
-  def initialize(keys)
-    @stdin = RawTrackingStdin.new
-    @keys = keys.dup
-  end
-
-  def next_key
-    KEY_BY_CHAR[@keys.shift]
   end
 end
 

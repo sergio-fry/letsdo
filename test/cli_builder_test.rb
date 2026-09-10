@@ -8,37 +8,6 @@ require 'tempfile'
 # usage stay in Letsdo::CLI; the builder owns component assembly and the
 # plain-vs-TUI decision (stdout/stdin TTY + TERM).
 class CliBuilderTest < Minitest::Test
-  class FakeTtyOut
-    def initialize
-      @io = StringIO.new
-    end
-
-    def tty?
-      true
-    end
-
-    def write(text) = @io.write(text)
-    def puts(*args) = @io.puts(*args)
-    def flush = @io.flush
-    def string = @io.string
-  end
-
-  class FakeTtyIn
-    def initialize(bytes)
-      @io = StringIO.new(bytes)
-    end
-
-    def tty?
-      true
-    end
-
-    def eof? = @io.eof?
-    def getc = @io.getc
-    def wait_readable(_timeout) = @io.eof? ? nil : true
-    def raw(&block) = block.call
-    def noecho(&block) = block.call
-  end
-
   def setup
     @out = StringIO.new
     @err = StringIO.new

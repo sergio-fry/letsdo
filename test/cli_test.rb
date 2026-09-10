@@ -4,66 +4,6 @@ require_relative 'test_helper'
 require 'stringio'
 require 'tempfile'
 
-# A fake terminal stream: reports tty? true, buffers writes like StringIO.
-class CliFakeTtyOut
-  attr_reader :io
-
-  def initialize
-    @io = StringIO.new
-  end
-
-  def tty?
-    true
-  end
-
-  def write(text)
-    @io.write(text)
-  end
-
-  def puts(*args)
-    @io.puts(*args)
-  end
-
-  def flush
-    @io.flush
-  end
-
-  def string
-    @io.string
-  end
-end
-
-# A fake keyboard: reports tty? true and serves the scripted bytes.
-class CliFakeTtyIn
-  def initialize(bytes)
-    @io = StringIO.new(bytes)
-  end
-
-  def tty?
-    true
-  end
-
-  def eof?
-    @io.eof?
-  end
-
-  def getc
-    @io.getc
-  end
-
-  def wait_readable(_timeout)
-    @io.eof? ? nil : true
-  end
-
-  def raw(&block)
-    block.call
-  end
-
-  def noecho(&block)
-    block.call
-  end
-end
-
 # CLI tests share stdout/stderr StringIOs and a fake-backlog env builder.
 # Each concern below is its own class so every class stays within the
 # default length limits.
@@ -295,11 +235,11 @@ class CliTuiTest < CliTest
   end
 
   def run_tui(keys, extra = {}, sleeper: nil)
-    tty_out = CliFakeTtyOut.new
+    tty_out = FakeTtyOut.new
     code = with_project(developer_prompts) do |root|
       Letsdo::CLI.run(['developer'], env: tui_env_hash(root, extra.dup),
                                      stdout: tty_out, stderr: @err,
-                                     stdin: CliFakeTtyIn.new(keys), sleeper: sleeper)
+                                     stdin: FakeTtyIn.new(keys), sleeper: sleeper)
     end
     [code, tty_out]
   end
@@ -356,7 +296,7 @@ class CliTuiTest < CliTest
   end
 
   def test_tui_not_engaged_when_stdin_is_not_a_tty
-    tty_out = CliFakeTtyOut.new
+    tty_out = FakeTtyOut.new
     code = with_project(developer_prompts) do |root|
       Letsdo::CLI.run(['developer'],
                       env: tui_env_hash(root, count: 1, term: 'xterm'),
