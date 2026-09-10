@@ -79,4 +79,33 @@ class AgentTest < Minitest::Test
   def test_default_prompt_constant_is_frozen
     assert_predicate Letsdo::DefaultPrompt::TEXT, :frozen?
   end
+
+  def test_run_agent_applies_model_from_front_matter
+    content = <<~MD
+      ---
+      model: my-model
+      ---
+      Developer prompt.
+    MD
+    with_project('developer' => content) do |root|
+      argv = captured_argv(make_agent(name: 'developer', root: root))
+
+      assert_includes argv, '--model|my-model|'
+    end
+  end
+
+  def test_run_agent_does_not_override_cli_model_flag
+    content = <<~MD
+      ---
+      model: file-model
+      ---
+      Developer prompt.
+    MD
+    with_project('developer' => content) do |root|
+      argv = captured_argv(make_agent(name: 'developer', root: root, flags: ['--model', 'cli-model']))
+
+      assert_includes argv, '--model|cli-model|'
+      refute_includes argv, 'file-model'
+    end
+  end
 end

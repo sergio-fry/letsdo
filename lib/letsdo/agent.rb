@@ -34,7 +34,14 @@ module Letsdo
     # @return [Integer] pi exit code
     def run
       prompt = prompt_store.read(@name) || Letsdo::DefaultPrompt::TEXT
-      @runner = PiRunner.new(prompt: prompt, flags: @flags, streamer: @streamer, command: @command)
+      flags  = @flags.dup
+
+      config = prompt_store.config(@name)
+      if (model = config[:model])
+        flags.unshift('--model', model) unless flags.include?('--model')
+      end
+
+      @runner = PiRunner.new(prompt: prompt, flags: flags, streamer: @streamer, command: @command)
       @runner.run
     end
 

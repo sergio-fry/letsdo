@@ -126,4 +126,42 @@ class PromptStoreTest < Minitest::Test
       refute Letsdo::PromptStore.unsafe_name?(name), "#{name.inspect} should be safe"
     end
   end
+
+  def test_config_returns_empty_hash_when_file_missing
+    with_empty_project do |root|
+      assert_equal({}, Letsdo::PromptStore.new(root: root).config('nosuch'))
+    end
+  end
+
+  def test_config_returns_empty_hash_when_no_front_matter
+    with_project('developer' => 'Prompt without config.') do |root|
+      assert_equal({}, Letsdo::PromptStore.new(root: root).config('developer'))
+    end
+  end
+
+  def test_config_parses_model_from_front_matter
+    content = <<~MD
+      ---
+      model: gpt-4o
+      ---
+      # Developer
+      Prompt text.
+    MD
+    with_project('developer' => content) do |root|
+      cfg = Letsdo::PromptStore.new(root: root).config('developer')
+      assert_equal 'gpt-4o', cfg[:model]
+    end
+  end
+
+  def test_config_ignores_invalid_front_matter
+    content = <<~MD
+      ---
+      : invalid: yaml: [unclosed
+      ---
+      Prompt.
+    MD
+    with_project('developer' => content) do |root|
+      assert_equal({}, Letsdo::PromptStore.new(root: root).config('developer'))
+    end
+  end
 end

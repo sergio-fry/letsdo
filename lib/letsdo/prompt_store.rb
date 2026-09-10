@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'fileutils'
+require 'yaml'
 
 module Letsdo
   # Access to agent prompts: the agents/<name>.md directory in the project
@@ -43,6 +44,20 @@ module Letsdo
       File.read(path)
     end
 
+    # Parsed launch configuration for an agent.
+    #
+    # Returns a hash with symbolised keys. An empty hash when the file
+    # is missing or has no YAML front matter.
+    #
+    # @param name [String] agent name
+    # @return [Hash{Symbol => Object}]
+    def config(name)
+      path = agent_path(name)
+      return {} unless File.file?(path)
+
+      self.class.parse_front_matter(File.read(path))
+    end
+
     # Absolute path of an agent's prompt file, whether or not it exists.
     #
     # @param name [String] agent name
@@ -67,6 +82,34 @@ module Letsdo
       FileUtils.mkdir_p(agents_dir)
       File.write(agent_path(name), content)
       true
+    end
+
+    # Parses an optional YAML front matter block delimited by `---` at
+    # the very start of a prompt file. Returns the keys symbolised;
+    # returns an empty hash when there is no front matter or it is
+    # invalid.
+    #
+    # @param content [String] full file content
+    # @return [Hash{Symbol => Object}]
+    def self.parse_front_matter(content)
+      # The content must start with a `---` line followed by front matter
+      # and a closing `---`.
+      match = content.match(/\A---
+?
+(.+?)
+?
+---
+?
+/m)
+      return {} unless match
+
+      raw = match[1]
+      parsed = YAML.safe_load(raw, permitted_classes: [])
+      return {} unless parsed.is_a?(Hash)
+
+      parsed.transform_keys(&:to_sym)
+    rescue StandardError
+      {}
     end
 
     private
