@@ -41,7 +41,8 @@ module Letsdo
       path = agent_path(name)
       return nil unless File.file?(path)
 
-      File.read(path)
+      content = File.read(path)
+      self.class.strip_front_matter(content)
     end
 
     # Parsed launch configuration for an agent.
@@ -84,6 +85,15 @@ module Letsdo
       true
     end
 
+    # Strips an optional YAML front matter block delimited by `---` at
+    # the very start of a prompt file. Returns the remaining content.
+    #
+    # @param content [String] full file content
+    # @return [String] content without front matter
+    def self.strip_front_matter(content)
+      content.sub(/\A---\n.+?\n---\n?/m, '')
+    end
+
     # Parses an optional YAML front matter block delimited by `---` at
     # the very start of a prompt file. Returns the keys symbolised;
     # returns an empty hash when there is no front matter or it is
@@ -105,9 +115,7 @@ module Letsdo
 
       raw = match[1]
       parsed = YAML.safe_load(raw, permitted_classes: [])
-      return {} unless parsed.is_a?(Hash)
-
-      parsed.transform_keys(&:to_sym)
+      parsed.is_a?(Hash) ? parsed.transform_keys(&:to_sym) : {}
     rescue StandardError
       {}
     end

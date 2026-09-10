@@ -27,8 +27,15 @@ class AgentLoopTest < Minitest::Test
     calls = 0
     lambda do
       calls += 1
-      calls == 1 ? tasks : []
+      calls == 1 ? tasks.map { |t| coerce_task(t) } : []
     end
+  end
+
+  def coerce_task(task)
+    return task if task.respond_to?(:id)
+    return Letsdo::Providers::Task.new(**task.transform_keys(&:to_sym)) if task.is_a?(Hash)
+
+    task
   end
 
   def counting_runner(runs, code = 0)

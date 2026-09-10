@@ -95,15 +95,9 @@ class AgentTest < Minitest::Test
   end
 
   def test_run_agent_does_not_override_cli_model_flag
-    content = <<~MD
-      ---
-      model: file-model
-      ---
-      Developer prompt.
-    MD
+    content = "---\nmodel: file-model\n---\nDeveloper prompt.\n"
     with_project('developer' => content) do |root|
       argv = captured_argv(make_agent(name: 'developer', root: root, flags: ['--model', 'cli-model']))
-
       assert_includes argv, '--model|cli-model|'
       refute_includes argv, 'file-model'
     end

@@ -47,7 +47,7 @@ module Letsdo
     end
 
     def task_label(task)
-      id = task.respond_to?(:[]) ? task['id'] : nil
+      id = task.respond_to?(:id) ? task.id : nil
       return id.to_s unless id.nil? || id.to_s.empty?
 
       task.to_s

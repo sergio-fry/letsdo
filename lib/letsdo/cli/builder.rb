@@ -95,8 +95,8 @@ module Letsdo
       end
 
       def provider_for(handle)
-        BacklogTasks.new(handle: handle, command: backlog_command, cwd: @root,
-                         env: ENV.to_h.merge(@env))
+        Providers::Backlog.new(handle: handle, command: backlog_command, cwd: @root,
+                               env: ENV.to_h.merge(@env))
       end
 
       def agent_loop(name, streamer, **opts)

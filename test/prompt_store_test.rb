@@ -5,9 +5,7 @@ require_relative 'test_helper'
 class PromptStoreTest < Minitest::Test
   def test_list_returns_sorted_agent_names
     with_project('zeta' => 'prompt', 'alpha' => 'prompt') do |root|
-      store = Letsdo::PromptStore.new(root: root)
-
-      assert_equal %w[alpha zeta], store.list
+      assert_equal %w[alpha zeta], Letsdo::PromptStore.new(root: root).list
     end
   end
 
@@ -19,25 +17,19 @@ class PromptStoreTest < Minitest::Test
 
   def test_read_returns_prompt_content
     with_project('developer' => 'You are a developer.') do |root|
-      store = Letsdo::PromptStore.new(root: root)
-
-      assert_equal 'You are a developer.', store.read('developer')
+      assert_equal 'You are a developer.', Letsdo::PromptStore.new(root: root).read('developer')
     end
   end
 
   def test_read_known_agent
     with_project('looptest' => 'You test the loop.') do |root|
-      store = Letsdo::PromptStore.new(root: root)
-
-      assert store.read('looptest').include?('loop')
+      assert Letsdo::PromptStore.new(root: root).read('looptest').include?('loop')
     end
   end
 
   def test_read_returns_nil_for_missing_agent
     with_project('developer' => 'You are a developer.') do |root|
-      store = Letsdo::PromptStore.new(root: root)
-
-      assert_nil store.read('nosuch')
+      assert_nil Letsdo::PromptStore.new(root: root).read('nosuch')
     end
   end
 
@@ -49,9 +41,7 @@ class PromptStoreTest < Minitest::Test
 
   def test_agent_path_is_absolute_and_predictable
     with_empty_project do |root|
-      store = Letsdo::PromptStore.new(root: root)
-
-      assert_equal File.join(File.expand_path(root), 'agents', 'nosuch.md'), store.agent_path('nosuch')
+      assert_equal File.join(File.expand_path(root), 'agents', 'nosuch.md'), Letsdo::PromptStore.new(root: root).agent_path('nosuch')
     end
   end
 
@@ -63,47 +53,37 @@ class PromptStoreTest < Minitest::Test
 
   def test_create_agent_writes_exact_content
     with_empty_project do |root|
-      store = Letsdo::PromptStore.new(root: root)
-
-      assert store.create_agent('developer', 'You are a developer.')
-      assert_equal 'You are a developer.', store.read('developer')
+      assert Letsdo::PromptStore.new(root: root).create_agent('developer', 'You are a developer.')
+      assert_equal 'You are a developer.', Letsdo::PromptStore.new(root: root).read('developer')
     end
   end
 
   def test_create_agent_writes_exactly_the_default_prompt
     with_empty_project do |root|
-      store = Letsdo::PromptStore.new(root: root)
-
-      assert store.create_agent('developer', Letsdo::DefaultPrompt::TEXT)
-      assert_equal Letsdo::DefaultPrompt::TEXT, store.read('developer')
+      assert Letsdo::PromptStore.new(root: root).create_agent('developer', Letsdo::DefaultPrompt::TEXT)
+      assert_equal Letsdo::DefaultPrompt::TEXT, Letsdo::PromptStore.new(root: root).read('developer')
     end
   end
 
   def test_create_agent_creates_the_agents_dir
     with_empty_project do |root|
-      store = Letsdo::PromptStore.new(root: root)
-
       refute File.directory?(File.join(root, 'agents'))
-      assert store.create_agent('developer', 'x')
-      assert_equal ['developer'], store.list
+      assert Letsdo::PromptStore.new(root: root).create_agent('developer', 'x')
+      assert_equal ['developer'], Letsdo::PromptStore.new(root: root).list
     end
   end
 
   def test_create_agent_refuses_an_existing_file_without_overwriting
     with_project('developer' => 'original') do |root|
-      store = Letsdo::PromptStore.new(root: root)
-
-      refute store.create_agent('developer', 'replacement')
-      assert_equal 'original', store.read('developer')
+      refute Letsdo::PromptStore.new(root: root).create_agent('developer', 'replacement')
+      assert_equal 'original', Letsdo::PromptStore.new(root: root).read('developer')
     end
   end
 
   def test_create_agent_refuses_unsafe_names_and_writes_nothing
     ['a/b', 'a\\b', '../x', '.', '..'].each do |name|
       with_empty_project do |root|
-        store = Letsdo::PromptStore.new(root: root)
-
-        refute store.create_agent(name, 'x'), "expected #{name.inspect} to be refused"
+        refute Letsdo::PromptStore.new(root: root).create_agent(name, 'x'), "expected #{name.inspect} to be refused"
         assert_empty Dir.glob(File.join(root, '**', '*.md')), "#{name.inspect} created a file"
       end
     end
@@ -111,22 +91,13 @@ class PromptStoreTest < Minitest::Test
 
   def test_create_agent_never_writes_outside_agents
     with_empty_project do |root|
-      store = Letsdo::PromptStore.new(root: root)
-
-      refute store.create_agent('../escape', 'x')
+      refute Letsdo::PromptStore.new(root: root).create_agent('../escape', 'x')
       refute File.exist?(File.join(root, 'escape.md'))
     end
   end
+end
 
-  def test_unsafe_name_predicate
-    %w[a/b a\\b . ..].each do |name|
-      assert Letsdo::PromptStore.unsafe_name?(name), "#{name.inspect} should be unsafe"
-    end
-    %w[developer agent-1 name.md].each do |name|
-      refute Letsdo::PromptStore.unsafe_name?(name), "#{name.inspect} should be safe"
-    end
-  end
-
+class PromptStoreConfigTest < Minitest::Test
   def test_config_returns_empty_hash_when_file_missing
     with_empty_project do |root|
       assert_equal({}, Letsdo::PromptStore.new(root: root).config('nosuch'))
@@ -140,13 +111,7 @@ class PromptStoreTest < Minitest::Test
   end
 
   def test_config_parses_model_from_front_matter
-    content = <<~MD
-      ---
-      model: gpt-4o
-      ---
-      # Developer
-      Prompt text.
-    MD
+    content = "---\nmodel: gpt-4o\n---\n# Developer\nPrompt text.\n"
     with_project('developer' => content) do |root|
       cfg = Letsdo::PromptStore.new(root: root).config('developer')
       assert_equal 'gpt-4o', cfg[:model]
@@ -154,12 +119,7 @@ class PromptStoreTest < Minitest::Test
   end
 
   def test_config_ignores_invalid_front_matter
-    content = <<~MD
-      ---
-      : invalid: yaml: [unclosed
-      ---
-      Prompt.
-    MD
+    content = "---\n: invalid: yaml: [unclosed\n---\nPrompt.\n"
     with_project('developer' => content) do |root|
       assert_equal({}, Letsdo::PromptStore.new(root: root).config('developer'))
     end

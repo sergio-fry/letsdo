@@ -37,8 +37,8 @@ module Letsdo
       flags  = @flags.dup
 
       config = prompt_store.config(@name)
-      if (model = config[:model])
-        flags.unshift('--model', model) unless flags.include?('--model')
+      if (model = config[:model]) && !flags.include?('--model')
+        flags.unshift('--model', model)
       end
 
       @runner = PiRunner.new(prompt: prompt, flags: flags, streamer: @streamer, command: @command)
