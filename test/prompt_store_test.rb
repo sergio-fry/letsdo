@@ -41,7 +41,9 @@ class PromptStoreTest < Minitest::Test
 
   def test_agent_path_is_absolute_and_predictable
     with_empty_project do |root|
-      assert_equal File.join(File.expand_path(root), 'agents', 'nosuch.md'), Letsdo::PromptStore.new(root: root).agent_path('nosuch')
+      store = Letsdo::PromptStore.new(root: root)
+      expected = File.join(File.expand_path(root), 'agents', 'nosuch.md')
+      assert_equal expected, store.agent_path('nosuch')
     end
   end
 

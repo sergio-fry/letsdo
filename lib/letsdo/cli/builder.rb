@@ -57,7 +57,7 @@ module Letsdo
     end
 
     # Owns all component assembly for running an agent (TASK-54): builds the
-    # streamer, agent, backlog provider, orchestrator loop and the whole TUI,
+    # streamer, agent, task provider, orchestrator loop and the whole TUI,
     # and decides plain vs TUI mode via stdout/stdin TTY + TERM. Parsing stays
     # in Letsdo::CLI (TASK-54); this class is the wiring half — independently
     # testable and free to grow with provider/backend selection (TASK-51/52)
@@ -65,18 +65,30 @@ module Letsdo
     class Builder
       include BuilderTui
 
-      def initialize(env:, stdout:, stderr:, stdin: $stdin, sleeper: nil)
+      # Provider registry: maps LETSDO_PROVIDER names to factories that build
+      # a provider from handle, command, cwd, and env.  Inject a custom
+      # registry via the constructor for tests.
+      PROVIDERS = {
+        'backlog' => lambda do |handle:, command:, cwd:, env:|
+          Providers::Backlog.new(handle: handle, command: command, cwd: cwd, env: env)
+        end
+      }.freeze
+
+      def initialize(env:, stdout:, stderr:, **rest)
         @env = env
         @stdout = stdout
         @stderr = stderr
-        @stdin = stdin
-        @sleeper = sleeper
+        @stdin = rest[:stdin] || $stdin
+        @sleeper = rest[:sleeper]
         @config = Config.new(env: env)
         @root = @config.root
+        @provider_registry = rest[:provider_registry] || PROVIDERS
       end
 
       # Runs <name> in plain or TUI mode; returns the process exit code.
       def run(name)
+        return 1 unless resolve_provider!
+
         store = PromptStore.new(root: @root)
         announce_default_prompt(name, store) if store.read(name).nil?
         tui? ? run_tui(name) : run_plain(name)
@@ -94,9 +106,21 @@ module Letsdo
                   command: pi_command)
       end
 
+      def resolve_provider!
+        @selected_provider_factory = @provider_registry[@config.provider]
+        return true if @selected_provider_factory
+
+        @stderr.puts("letsdo: unknown task provider: #{@config.provider}")
+        false
+      end
+
       def provider_for(handle)
-        Providers::Backlog.new(handle: handle, command: backlog_command, cwd: @root,
-                               env: ENV.to_h.merge(@env))
+        @selected_provider_factory.call(
+          handle: handle,
+          command: backlog_command,
+          cwd: @root,
+          env: ENV.to_h.merge(@env)
+        )
       end
 
       def agent_loop(name, streamer, **opts)

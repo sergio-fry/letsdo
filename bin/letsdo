@@ -32,6 +32,7 @@
 #   AGENT_ASSIGNEE_HANDLE   the agent's backlog assignee handle (default "@<name>")
 #   LETSDO_WAIT_SECONDS     retry interval when no tasks are open (default 10)
 #   LETSDO_BACKLOG_COMMAND  the backlog CLI command (default "backlog")
+#   LETSDO_PROVIDER         task provider name (default "backlog")
 #
 # A new agent = a new agents/<name>.md file, no code changes needed.
 #

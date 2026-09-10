@@ -77,6 +77,22 @@ class ConfigTest < Minitest::Test
     assert_equal 'bl', config('LETSDO_BACKLOG_COMMAND' => 'bl').backlog_command
   end
 
+  def test_provider_defaults_to_backlog
+    assert_equal 'backlog', config({}).provider
+  end
+
+  def test_provider_override
+    assert_equal 'jira', config('LETSDO_PROVIDER' => 'jira').provider
+  end
+
+  def test_provider_empty_falls_back_to_default
+    assert_equal 'backlog', config('LETSDO_PROVIDER' => '').provider
+  end
+
+  def test_provider_whitespace_falls_back_to_default
+    assert_equal 'backlog', config('LETSDO_PROVIDER' => '   ').provider
+  end
+
   def test_debug_disabled_by_default
     refute config({}).debug?
   end

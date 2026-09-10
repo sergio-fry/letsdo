@@ -184,6 +184,7 @@ All knobs are environment variables:
 | `LETSDO_WAIT_SECONDS` | 10 | Retry interval when there are no open tasks. |
 | `AGENT_WAIT_SECONDS` | — | Fallback for `LETSDO_WAIT_SECONDS` (`bin/agent-loop` compatibility). |
 | `LETSDO_BACKLOG_COMMAND` | `backlog` | The Backlog.md CLI command used as the task provider. |
+| `LETSDO_PROVIDER` | `backlog` | Task provider name used by the loop (currently only `backlog`). |
 | `LETSDO_DEBUG` | — | Set to `1` to trace loop decisions on stderr. |
 
 The comprehensive reference — every variable with defaults, precedences,

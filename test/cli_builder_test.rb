@@ -98,3 +98,74 @@ class CliBuilderTest < Minitest::Test
     end
   end
 end
+
+# Provider selection (TASK-58): the builder resolves LETSDO_PROVIDER through
+# the provider registry and fails fast on an unknown name.
+class CliBuilderProviderTest < Minitest::Test
+  def setup
+    @out = StringIO.new
+    @err = StringIO.new
+  end
+
+  def stop_on_first_wait
+    ->(_seconds) { throw Letsdo::AgentLoop::STOP }
+  end
+
+  def fake_backlog_env
+    {
+      'LETSDO_BACKLOG_COMMAND' => File.expand_path('fixtures/fake_backlog', __dir__),
+      'FAKE_BACKLOG_SCENARIO' => 'empty',
+      'LETSDO_PI_COMMAND' => File.expand_path('fixtures/fake_pi', __dir__)
+    }
+  end
+
+  def test_unknown_provider_fails_fast_with_error_and_exit_one
+    with_project({ 'developer' => 'You are a developer.' }) do |root|
+      env = fake_backlog_env.merge('LETSDO_ROOT' => root, 'LETSDO_PROVIDER' => 'jira')
+      code = builder_for(env).run('developer')
+
+      assert_equal 1, code
+      assert_includes @err.string, 'letsdo: unknown task provider: jira'
+    end
+  end
+
+  def test_provider_registry_is_injectable
+    state = { calls: 0, built_with: nil }
+    registry = custom_registry(state)
+    with_project({ 'developer' => 'You are a developer.' }) do |root|
+      env = { 'LETSDO_ROOT' => root, 'LETSDO_PROVIDER' => 'custom' }
+      code = builder_for(env, registry: registry).run('developer')
+
+      assert_equal 0, code
+      assert_equal 1, state[:calls]
+      assert_equal ['@developer', 'backlog', root], state[:built_with][0, 3]
+      assert_kind_of Hash, state[:built_with][3]
+    end
+  end
+
+  def custom_registry(state)
+    {
+      'custom' => lambda do |handle:, command:, cwd:, env:|
+        state[:built_with] = [handle, command, cwd, env]
+        fake_provider { state[:calls] += 1 }
+      end
+    }
+  end
+
+  private
+
+  def builder_for(env, registry: nil)
+    Letsdo::CLI::Builder.new(env: env, stdout: @out, stderr: @err, stdin: StringIO.new,
+                             sleeper: stop_on_first_wait, provider_registry: registry)
+  end
+
+  def fake_provider(&call)
+    # call responds with an empty batch: an empty array pauses the loop.
+    Object.new.tap do |provider|
+      provider.define_singleton_method(:call) do
+        call.call
+        []
+      end
+    end
+  end
+end

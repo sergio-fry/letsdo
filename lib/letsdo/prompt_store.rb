@@ -94,6 +94,8 @@ module Letsdo
       content.sub(/\A---\n.+?\n---\n?/m, '')
     end
 
+    FRONT_MATTER = /\A---\n?\n(.+?)\n?\n---\n?\n/m
+
     # Parses an optional YAML front matter block delimited by `---` at
     # the very start of a prompt file. Returns the keys symbolised;
     # returns an empty hash when there is no front matter or it is
@@ -102,22 +104,16 @@ module Letsdo
     # @param content [String] full file content
     # @return [Hash{Symbol => Object}]
     def self.parse_front_matter(content)
-      # The content must start with a `---` line followed by front matter
-      # and a closing `---`.
-      match = content.match(/\A---
-?
-(.+?)
-?
----
-?
-/m)
+      match = content.match(FRONT_MATTER)
       return {} unless match
 
-      raw = match[1]
-      parsed = YAML.safe_load(raw, permitted_classes: [])
-      parsed.is_a?(Hash) ? parsed.transform_keys(&:to_sym) : {}
+      symbolize_keys(YAML.safe_load(match[1], permitted_classes: []))
     rescue StandardError
       {}
+    end
+
+    def self.symbolize_keys(parsed)
+      parsed.is_a?(Hash) ? parsed.transform_keys(&:to_sym) : {}
     end
 
     private

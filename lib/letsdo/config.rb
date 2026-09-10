@@ -14,6 +14,7 @@ module Letsdo
     DEFAULT_WAIT_SECONDS = 10.0
     DEFAULT_PI_COMMAND = 'pi'
     DEFAULT_BACKLOG_COMMAND = 'backlog'
+    DEFAULT_PROVIDER = 'backlog'
 
     def initialize(env: ENV)
       @env = env
@@ -61,6 +62,12 @@ module Letsdo
     # The Backlog.md CLI used as the task provider.
     def backlog_command
       @env.fetch('LETSDO_BACKLOG_COMMAND', DEFAULT_BACKLOG_COMMAND)
+    end
+
+    # The task provider name. Reads LETSDO_PROVIDER with default 'backlog'.
+    # An empty value falls back to 'backlog'.
+    def provider
+      @env['LETSDO_PROVIDER'].to_s.strip.empty? ? DEFAULT_PROVIDER : @env['LETSDO_PROVIDER'].to_s.strip
     end
 
     # Whether [letsdo] traces are enabled in PiRunner and AgentLoop.
