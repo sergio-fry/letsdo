@@ -42,10 +42,18 @@ module Letsdo
       def spawn_pi
         cmd = [@command, '--mode', MODE, *@flags, @prompt]
         out_r, out_w = IO.pipe
+        spawn_process(cmd, out_r, out_w)
+      end
+
+      def spawn_process(cmd, out_r, out_w)
         @pid = Process.spawn(*cmd, out: out_w, err: $stderr, pgroup: true)
         out_w.close
         debug("spawned pid=#{@pid} (own group)")
         out_r
+      rescue Errno::ENOENT, Errno::EACCES => e
+        out_w.close
+        out_r.close
+        raise Letsdo::BackendUnavailableError, "cannot start AI backend '#{@command}': #{e.message}"
       end
 
       def drain_stream(out_r)

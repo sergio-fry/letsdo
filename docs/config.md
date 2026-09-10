@@ -29,6 +29,9 @@ LETSDO_ROOT  (default: the current working directory)
 | `AGENT_ASSIGNEE_HANDLE` | `@<name>` | The agent's backlog assignee handle (used verbatim when set). |
 | `LETSDO_WAIT_SECONDS` | `10` | Retry interval (seconds) when there are no open tasks. |
 | `AGENT_WAIT_SECONDS` | `10` (via fallback) | Fallback for `LETSDO_WAIT_SECONDS` when it is blank (`bin/agent-loop` compatibility). |
+| `LETSDO_MAX_RETRIES` | `3` | Max consecutive failed runs of the same task before giving up for the session. |
+| `LETSDO_RETRY_BASE` | = `LETSDO_WAIT_SECONDS` | Base backoff seconds; doubles per failure, capped by `LETSDO_RETRY_CAP`. |
+| `LETSDO_RETRY_CAP` | `300` | Maximum backoff seconds between attempts. |
 | `LETSDO_BACKLOG_COMMAND` | `backlog` | The Backlog.md CLI command used as the task provider. |
 | `LETSDO_PROVIDER` | `backlog` | Task provider name used by the loop (currently only `backlog`). |
 | `LETSDO_BACKEND` | `pi` | AI backend that runs each agent (only `pi` today; `LETSDO_PI_COMMAND`/`LETSDO_PI_FLAGS` keep working as before). |
@@ -41,6 +44,11 @@ LETSDO_ROOT  (default: the current working directory)
   blank result means no flags.
 - `LETSDO_WAIT_SECONDS` → `AGENT_WAIT_SECONDS`: same pattern, falling back
   to the default `10`. A non-numeric value also falls back to `10`.
+- `LETSDO_RETRY_BASE` → `LETSDO_WAIT_SECONDS`: when
+  `LETSDO_RETRY_BASE` is blank or non-numeric, the backoff base falls back
+  to the effective `LETSDO_WAIT_SECONDS` value.
+- `LETSDO_MAX_RETRIES`: an invalid (non-integer) value falls back to `3`.
+- `LETSDO_RETRY_CAP`: an invalid (non-numeric) value falls back to `300`.
 - `AGENT_ASSIGNEE_HANDLE`: used as-is when set and non-blank; otherwise the
   one rule: handle = `@<name>`.
 

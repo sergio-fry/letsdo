@@ -121,3 +121,45 @@ class ConfigTest < Minitest::Test
     refute config('LETSDO_DEBUG' => 'true').debug?
   end
 end
+
+class ConfigRetryEnvTest < Minitest::Test
+  def config(env)
+    Letsdo::Config.new(env: env)
+  end
+
+  def test_max_retries_defaults_to_three
+    assert_equal 3, config({}).max_retries
+  end
+
+  def test_max_retries_from_env
+    assert_equal 5, config('LETSDO_MAX_RETRIES' => '5').max_retries
+  end
+
+  def test_max_retries_invalid_falls_back_to_three
+    assert_equal 3, config('LETSDO_MAX_RETRIES' => 'not-a-number').max_retries
+  end
+
+  def test_retry_base_defaults_to_wait_seconds
+    assert_equal 10.0, config({}).retry_base
+  end
+
+  def test_retry_base_from_env
+    assert_equal 2.5, config('LETSDO_RETRY_BASE' => '2.5').retry_base
+  end
+
+  def test_retry_base_invalid_falls_back_to_wait_seconds
+    assert_equal 10.0, config('LETSDO_RETRY_BASE' => 'not-a-number').retry_base
+  end
+
+  def test_retry_cap_defaults_to_three_hundred
+    assert_equal 300.0, config({}).retry_cap
+  end
+
+  def test_retry_cap_from_env
+    assert_equal 600.0, config('LETSDO_RETRY_CAP' => '600').retry_cap
+  end
+
+  def test_retry_cap_invalid_falls_back_to_three_hundred
+    assert_equal 300.0, config('LETSDO_RETRY_CAP' => 'not-a-number').retry_cap
+  end
+end

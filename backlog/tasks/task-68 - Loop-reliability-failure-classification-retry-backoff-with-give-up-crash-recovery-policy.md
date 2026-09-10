@@ -3,11 +3,11 @@ id: TASK-68
 title: >-
   Loop reliability: failure classification, retry/backoff with give-up,
   crash-recovery policy
-status: To Do
+status: Done
 assignee:
   - '@developer'
 created_date: '2026-09-04 08:04'
-updated_date: '2026-09-04 10:27'
+updated_date: '2026-09-10 21:45'
 labels: []
 dependencies:
   - TASK-62
@@ -33,3 +33,11 @@ Implement the loop-reliability design from TASK-62 (design comments 1-3 + requir
 - [ ] #7 Tests: RetryPolicy unit tests with a fake monotonic clock (backoff spacing, max-retries give-up, state clearing); AgentLoop integration with fake provider/run_one (tight-loop regression: no 4th run of the same task in a session); spawn-error test with a fake command; rake test green (0 failures); rubocop 0 offenses
 - [ ] #8 README documents the failure-handling behavior and the 3 env knobs (LETSDO_MAX_RETRIES, LETSDO_RETRY_BASE, LETSDO_RETRY_CAP); all new UI/text in English (TASK-35)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implementation complete and verified. All 8 acceptance criteria met. rake test: 288 runs, 824 assertions, 0 failures, 0 errors. rubocop 1.77.0: 60 files inspected, 0 offenses. README updated with failure-handling section + 3 env knobs; docs/config.md updated for consistency.
+
+Files: lib/letsdo/retry_policy.rb (new), lib/letsdo/errors.rb (BackendUnavailableError), lib/letsdo/agent_loop.rb/tasks.rb (wiring + reconcile+filter), lib/letsdo/backends/pi.rb (spawn errno rescue), lib/letsdo/cli.rb (rescue exit 2), lib/letsdo/cli/builder.rb (retry_options), lib/letsdo/config.rb (3 knobs + invalid fallback), lib/letsdo.rb (require). Tests: test/retry_policy_test.rb (new), test/agent_loop_test.rb (retry integration), test/backends/pi_test.rb (spawn error), test/cli_test.rb (exit 2), test/config_test.rb (invalid fallback). Loop unchanged per AC #2.
+<!-- SECTION:NOTES:END -->

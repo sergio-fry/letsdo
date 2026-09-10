@@ -47,10 +47,17 @@ module Letsdo
       return init_command(argv) if argv.include?('--init')
       return unknown_option(arg) if arg.start_with?('-')
 
-      @builder.run(arg)
+      run_agent(arg)
     end
 
     private
+
+    def run_agent(arg)
+      @builder.run(arg)
+    rescue Letsdo::BackendUnavailableError => e
+      @stderr.puts("letsdo: #{e.message}")
+      2
+    end
 
     def version_flag?(arg)
       ['--version', '-v'].include?(arg)

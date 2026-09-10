@@ -12,6 +12,7 @@
 #   Letsdo::Capture          - interruption-safe child stdout/stderr capture
 #   Letsdo::BacklogTasks     - open tasks from the backlog CLI (the task provider)
 #   Letsdo::Loop             - generic orchestrator: tasks → runs → waiting
+#   Letsdo::RetryPolicy      - per-task retry/backoff/give-up policy (used at AgentLoop level)
 #   Letsdo::AgentLoop        - letsdo wiring: provider + agent + signals + messages
 #   Letsdo::Control          - agent-control primitives (PauseGate)
 #   Letsdo::Tui              - the interactive TUI (LogBuffer, Metrics,
@@ -32,6 +33,7 @@ require_relative 'letsdo/agent'
 require_relative 'letsdo/capture'
 require_relative 'letsdo/providers/backlog'
 require_relative 'letsdo/loop'
+require_relative 'letsdo/retry_policy'
 require_relative 'letsdo/watcher'
 require_relative 'letsdo/agent_loop'
 require_relative 'letsdo/control'

@@ -187,6 +187,18 @@ class CliRunTest < CliTest
     end
   end
 
+  def test_missing_backend_binary_exits_two_with_clear_message
+    env = fake_backlog_env(scenario: 'open',
+                           extra: { 'LETSDO_PI_COMMAND' => 'nonexistent_pi_xyz' })
+    code = run_cli(['developer'], prompts: developer_prompts, env: env,
+                                  sleeper: stop_on_first_wait)
+
+    assert_equal 2, code
+    assert_includes @err.string, 'letsdo: cannot start AI backend'\
+                                " 'nonexistent_pi_xyz'"
+    refute_includes @err.string, 'backtrace', 'must fail cleanly, no Ruby backtrace'
+  end
+
   def test_known_agent_assembles_output_via_pi
     code = run_developer(count: 1)
 

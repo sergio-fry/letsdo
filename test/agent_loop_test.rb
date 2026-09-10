@@ -14,7 +14,8 @@ class AgentLoopTest < Minitest::Test
       run_one: run_one, task_provider: provider,
       wait_seconds: opts.fetch(:wait_seconds, 0.5),
       sleeper: opts[:sleeper] || default_sleeper, stderr: stderr,
-      pause_gate: opts[:pause_gate], agent: opts[:agent]
+      pause_gate: opts[:pause_gate], agent: opts[:agent],
+      retry_policy: opts[:retry_policy]
     )
     [loop_obj, stderr]
   end
@@ -28,6 +29,18 @@ class AgentLoopTest < Minitest::Test
     lambda do
       calls += 1
       calls == 1 ? tasks.map { |t| coerce_task(t) } : []
+    end
+  end
+
+  def always_provider(tasks)
+    -> { tasks.map { |t| coerce_task(t) } }
+  end
+
+  def counting_sleeper(max_sleeps:)
+    calls = 0
+    lambda do |_seconds|
+      calls += 1
+      throw Letsdo::AgentLoop::STOP if calls >= max_sleeps
     end
   end
 
@@ -533,5 +546,61 @@ class AgentLoopWatcherTest < AgentLoopTest
     loop_obj.run
 
     assert_equal [1.5], watcher.waits
+  end
+end
+
+# Retry behavior (TASK-68): backoff, give-up, cooldown skip, and
+# fresh-session reset.
+class AgentLoopRetryTest < AgentLoopTest
+  def retry_run(base:, exit_code:, max_sleeps:, max_retries: 3, provider: nil)
+    policy = retry_policy(base, max_retries)
+    err = StringIO.new
+    runs = []
+    loop_obj, = make_loop(provider: provider || always_provider([{ 'id' => 'TASK-1' }]),
+                          run_one: counting_runner(runs, exit_code),
+                          wait_seconds: 0, sleeper: counting_sleeper(max_sleeps: max_sleeps),
+                          stderr: err, retry_policy: policy)
+    loop_obj.run
+    [runs, policy, err]
+  end
+
+  def retry_policy(base, max_retries)
+    Letsdo::RetryPolicy.new(base: base, cap: 300, max_retries: max_retries,
+                            clock: -> { 1000 })
+  end
+
+  def test_give_up_after_max_retries_stops_task_runs
+    runs, policy, err = retry_run(base: 0, exit_code: 1, max_sleeps: 1,
+                                  max_retries: 3)
+
+    assert_equal 3, runs.length
+    assert_equal 3, policy.failures('TASK-1')
+    assert_includes err.string,
+                    'letsdo: giving up on TASK-1 after 3 failed runs - ' \
+                    'task stays open, next session will retry it'
+  end
+
+  def test_cooldown_skip_does_not_re_record_failure
+    runs, policy, = retry_run(base: 10, exit_code: 1, max_sleeps: 2, max_retries: 5)
+
+    assert_equal 1, runs.length, 'task must run only once before cooldown holds it'
+    assert_equal 1, policy.failures('TASK-1')
+  end
+
+  def test_task_absent_clears_retry_state
+    calls = 0
+    provider = -> { (calls += 1) == 1 ? [Letsdo::Providers::Task.new(id: 'TASK-1')] : [] }
+    runs, policy, = retry_run(base: 10, exit_code: 1, max_sleeps: 2, max_retries: 5,
+                              provider: provider)
+
+    assert_equal 1, runs.length
+    assert_equal 0, policy.failures('TASK-1'), 'absent task must clear retry state'
+  end
+
+  def test_exit_zero_with_task_still_open_counts_as_failure
+    runs, policy, = retry_run(base: 0, exit_code: 0, max_sleeps: 1, max_retries: 2)
+
+    assert_equal 2, runs.length
+    assert_equal 2, policy.failures('TASK-1')
   end
 end

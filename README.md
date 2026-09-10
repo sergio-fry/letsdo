@@ -183,6 +183,9 @@ All knobs are environment variables:
 | `AGENT_ASSIGNEE_HANDLE` | `@<name>` | The agent's backlog assignee handle. The one rule: handle = name. |
 | `LETSDO_WAIT_SECONDS` | 10 | Retry interval when there are no open tasks. |
 | `AGENT_WAIT_SECONDS` | — | Fallback for `LETSDO_WAIT_SECONDS` (`bin/agent-loop` compatibility). |
+| `LETSDO_MAX_RETRIES` | 3 | Max consecutive failed runs of the same task before giving up for the session. |
+| `LETSDO_RETRY_BASE` | = `LETSDO_WAIT_SECONDS` | Base backoff seconds; doubles per failure, capped by `LETSDO_RETRY_CAP`. |
+| `LETSDO_RETRY_CAP` | 300 | Maximum backoff seconds between attempts. |
 | `LETSDO_BACKLOG_COMMAND` | `backlog` | The Backlog.md CLI command used as the task provider. |
 | `LETSDO_PROVIDER` | `backlog` | Task provider name used by the loop (currently only `backlog`). |
 | `LETSDO_BACKEND` | `pi` | AI backend that runs each agent (only `pi` today; `LETSDO_PI_COMMAND`/`LETSDO_PI_FLAGS` keep working as before). |
@@ -191,6 +194,39 @@ All knobs are environment variables:
 The comprehensive reference — every variable with defaults, precedences,
 examples and where each one is read — lives in the
 [configuration reference](docs/config.md).
+
+## Failure handling
+
+When an agent run fails, the loop avoids hammering the same task and
+instead backs off, then gives up for the session:
+
+- **Non-zero exit** (including a task killed by a signal, exit 128+):
+  counts as a failure of that task.
+- **Exit 0 but the task is still open** on the next provider poll:
+  also counts as a failure — the agent ended without closing the task.
+- **Task gone from the provider** after a run: counts as success and
+  clears the task's retry state.
+
+Failing tasks are retried with exponential backoff: after the *n*
+failure the task is skipped from the attempt batches until
+`now >= now + min(LETSDO_RETRY_BASE * 2^(n-1), LETSDO_RETRY_CAP)`
+seconds have elapsed (default: 10s, 20s, 40s, capped at 300s).
+
+After `LETSDO_MAX_RETRIES` (default 3) consecutive failures the loop
+stops attempting that task for the rest of the session, logs
+`letsdo: giving up on <TASK> after N failed runs — task stays open,
+next session will retry it` to stderr, and keeps processing other
+open tasks. A fresh `letsdo` session starts with no failure state,
+so a temporarily-failing task is retried next session.
+
+**Backend missing**: when the AI backend binary cannot be started
+(`LETSDO_PI_COMMAND` points at a nonexistent or non-executable file),
+letsdo prints a clear message and exits with code 2 — no Ruby
+backtrace.
+
+The loop's stop semantics are unchanged: `SIGINT`/`SIGTERM` during a
+backoff cooldown exits promptly with code 0, and a started run is
+always terminated (TERM then KILL after a grace period) and reaped.
 
 ## How it works
 

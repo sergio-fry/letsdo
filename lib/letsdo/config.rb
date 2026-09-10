@@ -16,6 +16,8 @@ module Letsdo
     DEFAULT_BACKLOG_COMMAND = 'backlog'
     DEFAULT_PROVIDER = 'backlog'
     DEFAULT_BACKEND = 'pi'
+    DEFAULT_MAX_RETRIES = 3
+    DEFAULT_RETRY_CAP = 300.0
 
     def initialize(env: ENV)
       @env = env
@@ -80,6 +82,38 @@ module Letsdo
     # Whether [letsdo] traces are enabled in the Pi backend and AgentLoop.
     def debug?
       @env['LETSDO_DEBUG'] == '1'
+    end
+
+    # Give-up after N consecutive failed runs of the same task in a session
+    # (default 3). Any invalid value falls back to the default.
+    def max_retries
+      value = @env['LETSDO_MAX_RETRIES'].to_s.strip
+      return DEFAULT_MAX_RETRIES if value.empty?
+
+      Integer(value)
+    rescue ArgumentError, TypeError
+      DEFAULT_MAX_RETRIES
+    end
+
+    # Base backoff seconds for the first retry; doubles per failure.
+    # Default = LETSDO_WAIT_SECONDS (the loop poll interval). An invalid
+    # value falls back to that default.
+    def retry_base
+      value = @env['LETSDO_RETRY_BASE'].to_s.strip
+      value.empty? ? wait_seconds : Float(value)
+    rescue ArgumentError, TypeError
+      wait_seconds
+    end
+
+    # Maximum backoff seconds (default 300). An invalid value falls back
+    # to the default.
+    def retry_cap
+      value = @env['LETSDO_RETRY_CAP'].to_s.strip
+      return DEFAULT_RETRY_CAP if value.empty?
+
+      Float(value)
+    rescue ArgumentError, TypeError
+      DEFAULT_RETRY_CAP
     end
   end
 end

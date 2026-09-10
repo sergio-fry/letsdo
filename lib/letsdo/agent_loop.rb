@@ -56,7 +56,20 @@ module Letsdo
       @run_one = opts[:run_one] || ->(_task) { @agent.run }
       @wait_seconds = opts.fetch(:wait_seconds, 10.0)
       @stderr = opts.fetch(:stderr, $stderr)
+      @retry_policy = build_retry_policy(opts)
+      @last_attempted = {}
       assign_control_opts(opts)
+    end
+
+    def build_retry_policy(opts)
+      return opts[:retry_policy] if opts[:retry_policy]
+
+      Letsdo::RetryPolicy.new(
+        base: opts.fetch(:retry_base, @wait_seconds),
+        cap: opts.fetch(:retry_cap, Letsdo::RetryPolicy::DEFAULT_CAP),
+        max_retries: opts.fetch(:max_retries, Letsdo::RetryPolicy::DEFAULT_MAX_RETRIES),
+        clock: opts[:clock]
+      )
     end
 
     def assign_control_opts(opts)

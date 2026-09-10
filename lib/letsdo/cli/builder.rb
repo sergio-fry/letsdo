@@ -167,7 +167,11 @@ module Letsdo
                       task_provider: -> { provider.call },
                       wait_seconds: wait_seconds, sleeper: @sleeper, stderr: opts[:stderr],
                       metrics: opts[:metrics], pause_gate: opts[:pause_gate],
-                      watcher: backlog_watcher)
+                      watcher: backlog_watcher, **retry_options)
+      end
+
+      def retry_options
+        { retry_base: @config.retry_base, retry_cap: @config.retry_cap, max_retries: @config.max_retries }
       end
 
       def backlog_watcher

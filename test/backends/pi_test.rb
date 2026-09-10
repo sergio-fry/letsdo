@@ -37,6 +37,20 @@ class BackendsPiTest < Minitest::Test
   end
 end
 
+# Process spawn failure: missing / non-executable backend binary.
+class BackendsPiSpawnErrorTest < BackendsPiTest
+  def test_missing_backend_command_raises_backend_unavailable
+    backend = Letsdo::Backends::Pi.new(prompt: 'You are an agent',
+                                       streamer: @streamer,
+                                       command: 'nonexistent_pi_xyz')
+
+    err = assert_raises(Letsdo::BackendUnavailableError) do
+      backend.run
+    end
+    assert_match(/cannot start AI backend/, err.message)
+  end
+end
+
 # Event-stream behaviour: argv, exit codes, text, tools.
 class BackendsPiStreamTest < BackendsPiTest
   def test_runs_pi_with_mode_json_flags_and_prompt_in_argv
