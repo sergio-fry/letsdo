@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require_relative 'cli/launch'
 require_relative 'cli/init'
+require_relative 'cli/builder'
 
 module Letsdo
   # Command-line argument parsing and running an agent orchestrator loop.
@@ -20,7 +20,6 @@ module Letsdo
   #   letsdo --init <name>         — same, flag-first form;
   #   letsdo <unknown option>      — "letsdo: unknown option: X" + usage, exit 1.
   class CLI
-    include CLILaunch
     include CLIInit
 
     USAGE = 'Usage: letsdo <agent_name>'
@@ -33,13 +32,11 @@ module Letsdo
     end
 
     def initialize(env:, stdout:, stderr:, stdin: $stdin, sleeper: nil)
-      @env = env
       @stdout = stdout
       @stderr = stderr
-      @stdin = stdin
-      @sleeper = sleeper
-      @config = Config.new(env: env)
-      @root = @config.root
+      @root = Config.new(env: env).root
+      @builder = Builder.new(env: env, stdout: stdout, stderr: stderr,
+                             stdin: stdin, sleeper: sleeper)
     end
 
     def run(argv)
@@ -50,7 +47,7 @@ module Letsdo
       return init_command(argv) if argv.include?('--init')
       return unknown_option(arg) if arg.start_with?('-')
 
-      run_agent(arg)
+      @builder.run(arg)
     end
 
     private
@@ -84,40 +81,6 @@ module Letsdo
       1
     end
 
-    def run_agent(name)
-      store = PromptStore.new(root: @root)
-      announce_default_prompt(name, store) if store.read(name).nil?
-      tui? ? run_agent_tui(name) : run_agent_plain(name)
-    end
-
-    # One-time fallback notification (before the first loop message): names
-    # the exact path checked and the placement hint. The agent still starts
-    # — Letsdo::Agent falls back to the built-in default prompt itself.
-    def announce_default_prompt(name, store)
-      @stderr.puts("letsdo: no prompt for #{name} at #{store.agent_path(name)}")
-      @stderr.puts("letsdo: using the built-in default prompt (create a prompt file with 'letsdo #{name} --init')")
-    end
-
-    def tui?
-      @stdout.tty? && @stdin.tty? && @env['TERM'].to_s != 'dumb'
-    end
-
-    def assignee_handle(name)
-      @config.assignee_handle(name)
-    end
-
-    def backlog_command
-      @config.backlog_command
-    end
-
-    def wait_seconds
-      @config.wait_seconds
-    end
-
-    def pi_command
-      @config.pi_command
-    end
-
     def print_usage(stream)
       stream.puts(USAGE)
       print_agents
@@ -126,10 +89,6 @@ module Letsdo
     def print_agents
       @stdout.puts(AGENTS_HEADER)
       PromptStore.new(root: @root).list.each { |name| @stdout.puts("  #{name}") }
-    end
-
-    def parse_pi_flags
-      @config.pi_flags
     end
   end
 end
