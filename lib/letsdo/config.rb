@@ -4,8 +4,8 @@ require 'shellwords'
 
 module Letsdo
   # The single place where every LETSDO_*/AGENT_* environment variable is
-  # read, with exactly the defaults and precedence the CLI, PiRunner and
-  # AgentLoop used to apply inline. Giving env policy one home makes it
+  # read, with exactly the defaults and precedence the CLI, the Pi backend
+  # and AgentLoop used to apply inline. Giving env policy one home makes it
   # testable in one place and gives future knobs (provider/backend
   # selection) a single spot to add a variable.
   #
@@ -15,6 +15,7 @@ module Letsdo
     DEFAULT_PI_COMMAND = 'pi'
     DEFAULT_BACKLOG_COMMAND = 'backlog'
     DEFAULT_PROVIDER = 'backlog'
+    DEFAULT_BACKEND = 'pi'
 
     def initialize(env: ENV)
       @env = env
@@ -54,7 +55,7 @@ module Letsdo
       DEFAULT_WAIT_SECONDS
     end
 
-    # The pi command used to run agents (same literal as PiRunner::COMMAND).
+    # The pi command used to run agents (same literal as Backends::Pi::COMMAND).
     def pi_command
       @env.fetch('LETSDO_PI_COMMAND', DEFAULT_PI_COMMAND)
     end
@@ -70,7 +71,13 @@ module Letsdo
       @env['LETSDO_PROVIDER'].to_s.strip.empty? ? DEFAULT_PROVIDER : @env['LETSDO_PROVIDER'].to_s.strip
     end
 
-    # Whether [letsdo] traces are enabled in PiRunner and AgentLoop.
+    # The AI backend name. Reads LETSDO_BACKEND with default 'pi'.
+    # An empty value falls back to 'pi'.
+    def backend
+      @env['LETSDO_BACKEND'].to_s.strip.empty? ? DEFAULT_BACKEND : @env['LETSDO_BACKEND'].to_s.strip
+    end
+
+    # Whether [letsdo] traces are enabled in the Pi backend and AgentLoop.
     def debug?
       @env['LETSDO_DEBUG'] == '1'
     end

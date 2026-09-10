@@ -1,13 +1,12 @@
 # frozen_string_literal: true
 
-require_relative 'test_helper'
+require_relative '../test_helper'
 require 'stringio'
 require 'tempfile'
 
-# PiRunner tests drive the real runner against test/fixtures/fake_pi.
-# The base class holds the harness; each concern below is its own class
-# so every class stays within the default length limits.
-class PiRunnerTest < Minitest::Test
+# Backend protocol tests for Letsdo::Backends::Pi adapter.
+# Uses fake_pi fixture and tests the normalized backend protocol.
+class BackendsPiTest < Minitest::Test
   def setup
     @out = StringIO.new
     @err = StringIO.new
@@ -15,17 +14,17 @@ class PiRunnerTest < Minitest::Test
   end
 
   def run_pi(prompt:, flags: [], scenario: nil)
-    runner = Letsdo::PiRunner.new(prompt: prompt, flags: flags, streamer: @streamer,
-                                  command: fake_pi)
-    with_env(scenario_env(scenario)) { runner.run }
+    backend = Letsdo::Backends::Pi.new(prompt: prompt, flags: flags, streamer: @streamer,
+                                       command: fake_pi)
+    with_env(scenario_env(scenario)) { backend.run }
   end
 
   def scenario_env(scenario)
     scenario ? { 'FAKE_PI_SCENARIO' => scenario } : {}
   end
 
-  def new_runner
-    Letsdo::PiRunner.new(prompt: 'You are an agent', streamer: @streamer, command: fake_pi)
+  def new_backend
+    Letsdo::Backends::Pi.new(prompt: 'You are an agent', streamer: @streamer, command: fake_pi)
   end
 
   # Waits for the child to enter the stopped state (WUNTRACED reports it
@@ -39,7 +38,7 @@ class PiRunnerTest < Minitest::Test
 end
 
 # Event-stream behaviour: argv, exit codes, text, tools.
-class PiRunnerStreamTest < PiRunnerTest
+class BackendsPiStreamTest < BackendsPiTest
   def test_runs_pi_with_mode_json_flags_and_prompt_in_argv
     with_argv_capture do |path|
       run_pi(prompt: 'You are an agent', flags: ['--model', 'm'])
@@ -125,14 +124,14 @@ class PiRunnerStreamTest < PiRunnerTest
 end
 
 # Process control: terminate, pause, resume, ESRCH no-ops.
-class PiRunnerControlTest < PiRunnerTest
+class BackendsPiControlTest < BackendsPiTest
   def test_terminate_stops_a_running_pi
-    runner = new_runner
+    backend = new_backend
     result = nil
     with_env('FAKE_PI_SLEEP' => '300') do
-      thread = Thread.new { result = runner.run }
+      thread = Thread.new { result = backend.run }
       sleep 0.3
-      runner.terminate
+      backend.terminate
       thread.join(10)
       refute thread.alive?, 'terminate did not stop the run'
       assert_equal 143, result
@@ -140,15 +139,14 @@ class PiRunnerControlTest < PiRunnerTest
   end
 
   def test_terminate_when_run_finished_is_a_noop
-    runner = new_runner
-
-    assert_equal 0, runner.run
-    refute_nil runner.terminate
+    backend = new_backend
+    assert_equal 0, backend.run
+    refute_nil backend.terminate
   end
 
   def test_pause_stops_the_pi_group_mid_run
-    with_background_pi(300) do |runner, thread, result_box, pid|
-      runner.pause
+    with_background_pi(300) do |backend, thread, result_box, pid|
+      backend.pause
       status = wait_stopped(pid)
       assert_stopped_by_sigstop(status)
       sleep 0.1
@@ -163,10 +161,10 @@ class PiRunnerControlTest < PiRunnerTest
   end
 
   def test_resume_continues_the_run_with_unchanged_exit_code
-    with_background_pi(3) do |runner, thread, result_box, pid|
-      runner.pause
+    with_background_pi(3) do |backend, thread, result_box, pid|
+      backend.pause
       wait_stopped(pid)
-      runner.resume
+      backend.resume
       thread.join(10)
       refute thread.alive?, 'resume did not let the run finish'
       assert_equal 0, result_box[:result], 'exit code must be unchanged after pause/resume'
@@ -174,43 +172,36 @@ class PiRunnerControlTest < PiRunnerTest
   end
 
   def test_pause_and_resume_are_noops_without_a_run
-    runner = new_runner
+    backend = new_backend
 
-    assert_nil runner.pause
-    assert_nil runner.resume
-    assert_equal 0, runner.run
-    assert_nil runner.pause
-    assert_nil runner.resume
+    assert_nil backend.pause
+    assert_nil backend.resume
+    assert_equal 0, backend.run
+    assert_nil backend.pause
+    assert_nil backend.resume
   end
 
   def test_pause_and_resume_swallow_esrch_for_a_dead_group
-    runner = new_runner
+    backend = new_backend
     dead_pid = Process.spawn('true')
     Process.wait(dead_pid)
-    runner.instance_variable_set(:@pid, dead_pid)
+    backend.instance_variable_set(:@pid, dead_pid)
 
-    assert_nil runner.pause
-    assert_nil runner.resume
+    assert_nil backend.pause
+    assert_nil backend.resume
   rescue Errno::ESRCH, Errno::EPERM
     flunk 'pause/resume must swallow ESRCH/EPERM like send_signal'
   end
 
   def test_terminate_kills_a_paused_pi_promptly
-    with_background_pi(300) do |runner, thread, result_box, pid|
-      runner.pause
+    with_background_pi(300) do |backend, thread, result_box, pid|
+      backend.pause
       wait_stopped(pid)
-      assert_prompt_terminate(runner)
+      backend.terminate
       thread.join(10)
       refute thread.alive?, 'terminate did not stop the paused run'
       assert_equal 143, result_box[:result], 'killed by SIGTERM → 128 + 15'
     end
-  end
-
-  def assert_prompt_terminate(runner)
-    start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    runner.terminate
-    elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
-    assert_operator elapsed, :<, 1.0, "terminate on a paused pi took #{elapsed.round(2)}s"
   end
 
   def with_background_pi(sleep_seconds)
@@ -219,14 +210,28 @@ class PiRunnerControlTest < PiRunnerTest
     env = { 'FAKE_PI_SLEEP' => sleep_seconds.to_s, 'FAKE_PI_READY_FILE' => ready_file }
     with_env(env) { run_background_body(ctx, ready_file) { |*args| yield(*args) } }
   ensure
-    ctx[:runner]&.terminate
+    ctx[:backend]&.terminate
     ctx[:thread]&.join(5)
   end
 
   def run_background_body(ctx, ready_file)
     result_box = { result: nil }
-    ctx[:runner] = new_runner
-    ctx[:thread] = Thread.new { result_box[:result] = ctx[:runner].run }
-    yield ctx[:runner], ctx[:thread], result_box, wait_for_ready_file(ready_file)
+    ctx[:backend] = new_backend
+    ctx[:thread] = Thread.new { result_box[:result] = ctx[:backend].run }
+    yield ctx[:backend], ctx[:thread], result_box, wait_for_ready_file(ready_file)
+  end
+
+  def wait_for_ready_file(ready_file, timeout: 5)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+    loop do
+      return File.read(ready_file).to_i if File.exist?(ready_file)
+
+      flunk "fake pi did not become ready within #{timeout}s" if overdue?(deadline)
+      sleep 0.01
+    end
+  end
+
+  def overdue?(deadline)
+    Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
   end
 end

@@ -6,7 +6,7 @@ module Letsdo
   module Control
     # A thread-safe pause flag polled by Letsdo::AgentLoop between runs.
     #
-    # Mid-run suspension is handled by Letsdo::PiRunner#pause (SIGSTOP to
+    # Mid-run suspension is handled by Letsdo::Backends::Pi#pause (SIGSTOP to
     # the pi group, kernel-level freeze). Between runs there is no pi to
     # stop, so the pause lives in this gate: while #paused? is true the
     # loop must not start a new run, and it waits until #resume.

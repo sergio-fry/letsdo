@@ -7,7 +7,7 @@
 #   Letsdo::PromptStore      - access to agents/*.md prompts
 #   Letsdo::DefaultPrompt    - the built-in default prompt (fallback run, --init template)
 #   Letsdo::OutputStreamer   - where and how agent text and service lines are printed
-#   Letsdo::PiRunner         - running pi --mode json and parsing the event stream
+#   Letsdo::Backends::Pi     - running pi --mode json and parsing the event stream
 #   Letsdo::Agent            - a single agent run: prompt from agents/ or default + pi
 #   Letsdo::Capture          - interruption-safe child stdout/stderr capture
 #   Letsdo::BacklogTasks     - open tasks from the backlog CLI (the task provider)
@@ -26,7 +26,8 @@ require_relative 'letsdo/config'
 require_relative 'letsdo/prompt_store'
 require_relative 'letsdo/default_prompt'
 require_relative 'letsdo/output_streamer'
-require_relative 'letsdo/pi_runner'
+require_relative 'letsdo/backends/backend'
+require_relative 'letsdo/backends/pi'
 require_relative 'letsdo/agent'
 require_relative 'letsdo/capture'
 require_relative 'letsdo/providers/backlog'

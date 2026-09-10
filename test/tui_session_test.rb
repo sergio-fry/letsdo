@@ -37,7 +37,7 @@ class TuiSessionTest < Minitest::Test
     session.run(&work)
   end
 
-  # A stub standing in for Letsdo::PiRunner: records pause/resume.
+  # A stub standing in for Letsdo::Backends::Pi: records pause/resume.
   class FakeRunner
     attr_reader :calls
 

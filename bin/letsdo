@@ -33,6 +33,8 @@
 #   LETSDO_WAIT_SECONDS     retry interval when no tasks are open (default 10)
 #   LETSDO_BACKLOG_COMMAND  the backlog CLI command (default "backlog")
 #   LETSDO_PROVIDER         task provider name (default "backlog")
+#   LETSDO_BACKEND          AI backend that runs each agent (default "pi";
+#                           unknown values fail fast with exit code 1)
 #
 # A new agent = a new agents/<name>.md file, no code changes needed.
 #

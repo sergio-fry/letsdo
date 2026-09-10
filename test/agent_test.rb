@@ -12,7 +12,10 @@ class AgentTest < Minitest::Test
   end
 
   def make_agent(name:, root:, flags: [])
-    Letsdo::Agent.new(name: name, root: root, flags: flags, streamer: @streamer, command: fake_pi)
+    pi_backend_factory = lambda do |prompt:, streamer:, model: nil|
+      Letsdo::Backends::Pi.new(prompt: prompt, streamer: streamer, flags: flags, command: fake_pi, model: model)
+    end
+    Letsdo::Agent.new(name: name, root: root, backend_factory: pi_backend_factory, streamer: @streamer)
   end
 
   def test_run_known_agent_returns_exit_code
@@ -91,6 +94,15 @@ class AgentTest < Minitest::Test
       argv = captured_argv(make_agent(name: 'developer', root: root))
 
       assert_includes argv, '--model|my-model|'
+    end
+  end
+
+  def test_agent_exposes_backend
+    with_project('developer' => 'You are a developer.') do |root|
+      agent = make_agent(name: 'developer', root: root)
+      agent.run
+
+      refute_nil agent.backend
     end
   end
 

@@ -2,7 +2,7 @@
 # frozen_string_literal: true
 
 #
-# Fake pi for Letsdo::PiRunner / Letsdo::Agent / Letsdo::CLI tests.
+# Fake pi for Letsdo::Backends::Pi / Letsdo::Agent / Letsdo::CLI tests.
 #
 # Behaves like pi --mode json for deterministic scenarios:
 #   - accepts the same arguments: --mode json [flags] <prompt>;

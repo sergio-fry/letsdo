@@ -51,7 +51,7 @@ module Letsdo
           input: Tui::Input.new(stdin: @stdin),
           refresh: -> { parts[:provider].call },
           wait_seconds: wait_seconds, clock: parts[:clock],
-          pause_gate: parts[:pause_gate], runner: -> { parts[:agent].runner }
+          pause_gate: parts[:pause_gate], runner: -> { parts[:agent].backend }
         }
       end
     end
@@ -74,6 +74,24 @@ module Letsdo
         end
       }.freeze
 
+      # Backend registry: maps LETSDO_BACKEND names to factory builders that
+      # take the Letsdo::Config and return a backend_factory (callable with
+      # prompt:, streamer:, model:). The pi entry captures the pi command and
+      # flags from Config (LETSDO_PI_COMMAND / LETSDO_PI_FLAGS with the
+      # AGENT_PI_FLAGS fallback), keeping pi vocabulary out of the business
+      # layer.  Inject a custom registry via the constructor for tests.
+      BACKENDS = {
+        'pi' => lambda do |config:|
+          command = config.pi_command
+          flags = config.pi_flags
+          lambda { |prompt:, streamer:, model: nil|
+            Letsdo::Backends::Pi.new(prompt: prompt, streamer: streamer,
+                                     flags: flags, command: command,
+                                     model: model, config: config)
+          }
+        end
+      }.freeze
+
       def initialize(env:, stdout:, stderr:, **rest)
         @env = env
         @stdout = stdout
@@ -83,11 +101,13 @@ module Letsdo
         @config = Config.new(env: env)
         @root = @config.root
         @provider_registry = rest[:provider_registry] || PROVIDERS
+        @backend_registry = rest[:backend_registry] || BACKENDS
       end
 
       # Runs <name> in plain or TUI mode; returns the process exit code.
       def run(name)
         return 1 unless resolve_provider!
+        return 1 unless resolve_backend!
 
         store = PromptStore.new(root: @root)
         announce_default_prompt(name, store) if store.read(name).nil?
@@ -102,8 +122,24 @@ module Letsdo
       end
 
       def agent_for(name, streamer)
-        Agent.new(name: name, root: @root, flags: parse_pi_flags, streamer: streamer,
-                  command: pi_command)
+        Agent.new(name: name, root: @root,
+                  backend_factory: @selected_backend_factory,
+                  streamer: streamer)
+      end
+
+      # Resolves LETSDO_BACKEND through the backend registry once per run,
+      # so both wiring paths (plain and TUI) build the Agent's
+      # backend_factory through the same registry entry.  An unknown backend
+      # name fails fast instead of silently falling back.
+      def resolve_backend!
+        builder = @backend_registry[@config.backend]
+        if builder
+          @selected_backend_factory = builder.call(config: @config)
+          return true
+        end
+
+        @stderr.puts("letsdo: unknown AI backend: #{@config.backend}")
+        false
       end
 
       def resolve_provider!
@@ -160,14 +196,6 @@ module Letsdo
 
       def wait_seconds
         @config.wait_seconds
-      end
-
-      def pi_command
-        @config.pi_command
-      end
-
-      def parse_pi_flags
-        @config.pi_flags
       end
     end
   end

@@ -38,8 +38,14 @@ module Letsdo
       warn("[letsdo] loop: #{message}") if @debug
     end
 
+    # Stop the running backend immediately.  The signal handler is
+    # invoked from the main thread (Ruby 4.0) or from a dedicated signal
+    # thread (3.x fallback via AGENT_SIGNAL_THREAD=1).  Thread.raise
+    # works reliably on CRuby 4.0: M:N fibers make threads interruptible
+    # everywhere, so a trap handler may safely raise Letsdo::Stopped on
+    # the main thread to unwind the current run.
     def on_signal(_signum)
-      @agent&.runner&.terminate_now
+      @agent&.backend&.terminate_now
       raise Letsdo::Stopped
     end
 

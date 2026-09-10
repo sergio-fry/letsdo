@@ -3,7 +3,7 @@
 require_relative 'test_helper'
 
 # Letsdo::Config reads every LETSDO_*/AGENT_* variable with the defaults and
-# precedence that used to be spread across CLI, PiRunner and AgentLoop.
+# precedence that used to be spread across CLI, the Pi backend and AgentLoop.
 class ConfigTest < Minitest::Test
   def config(env)
     Letsdo::Config.new(env: env)
@@ -91,6 +91,22 @@ class ConfigTest < Minitest::Test
 
   def test_provider_whitespace_falls_back_to_default
     assert_equal 'backlog', config('LETSDO_PROVIDER' => '   ').provider
+  end
+
+  def test_backend_defaults_to_pi
+    assert_equal 'pi', config({}).backend
+  end
+
+  def test_backend_override
+    assert_equal 'claude', config('LETSDO_BACKEND' => 'claude').backend
+  end
+
+  def test_backend_empty_falls_back_to_default
+    assert_equal 'pi', config('LETSDO_BACKEND' => '').backend
+  end
+
+  def test_backend_whitespace_falls_back_to_default
+    assert_equal 'pi', config('LETSDO_BACKEND' => '   ').backend
   end
 
   def test_debug_disabled_by_default

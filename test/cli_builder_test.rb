@@ -3,6 +3,7 @@
 require_relative 'test_helper'
 require 'stringio'
 require 'tempfile'
+require_relative 'helpers/fake_backend'
 
 # Letsdo::CLI::Builder (TASK-54): the wiring half of the CLI. Parsing and
 # usage stay in Letsdo::CLI; the builder owns component assembly and the
@@ -154,9 +155,10 @@ class CliBuilderProviderTest < Minitest::Test
 
   private
 
-  def builder_for(env, registry: nil)
+  def builder_for(env, registry: nil, backend_registry: nil)
     Letsdo::CLI::Builder.new(env: env, stdout: @out, stderr: @err, stdin: StringIO.new,
-                             sleeper: stop_on_first_wait, provider_registry: registry)
+                             sleeper: stop_on_first_wait, provider_registry: registry,
+                             backend_registry: backend_registry)
   end
 
   def fake_provider(&call)
@@ -165,6 +167,107 @@ class CliBuilderProviderTest < Minitest::Test
       provider.define_singleton_method(:call) do
         call.call
         []
+      end
+    end
+  end
+end
+
+# Backend selection (TASK-60): the builder resolves LETSDO_BACKEND through
+# the backend registry and fails fast on an unknown name; the registry is
+# injectable so an in-process fake backend can be switched in for tests.
+class CliBuilderBackendTest < Minitest::Test
+  def setup
+    @out = StringIO.new
+    @err = StringIO.new
+  end
+
+  def stop_on_first_wait
+    ->(_seconds) { throw Letsdo::AgentLoop::STOP }
+  end
+
+  def fake_backlog_env
+    {
+      'LETSDO_BACKLOG_COMMAND' => File.expand_path('fixtures/fake_backlog', __dir__),
+      'FAKE_BACKLOG_SCENARIO' => 'empty',
+      'LETSDO_PI_COMMAND' => File.expand_path('fixtures/fake_pi', __dir__)
+    }
+  end
+
+  def open_backlog_env(count:, done_file:)
+    {
+      'LETSDO_BACKLOG_COMMAND' => File.expand_path('fixtures/fake_backlog', __dir__),
+      'FAKE_BACKLOG_SCENARIO' => 'open',
+      'FAKE_BACKLOG_COUNT' => count.to_s,
+      'FAKE_BACKLOG_DONE_FILE' => done_file,
+      'LETSDO_PI_COMMAND' => File.expand_path('fixtures/fake_pi', __dir__)
+    }
+  end
+
+  def test_unknown_backend_fails_fast_with_error_and_exit_one
+    with_project({ 'developer' => 'You are a developer.' }) do |root|
+      env = fake_backlog_env.merge('LETSDO_ROOT' => root, 'LETSDO_BACKEND' => 'claude')
+      code = builder_for(env).run('developer')
+
+      assert_equal 1, code
+      assert_includes @err.string, 'letsdo: unknown AI backend: claude'
+    end
+  end
+
+  def test_backend_registry_is_injectable_with_the_fake_backend
+    state = { built: 0, run: 0 }
+
+    code = run_with_backend(custom_backend_registry(state), backend: 'fake')
+
+    assert_equal 0, code
+    assert_equal 1, state[:built]
+    assert_equal 1, state[:run]
+    assert_includes @err.string, 'letsdo: running developer for TASK-1'
+  end
+
+  def test_no_letsdo_backend_uses_the_pi_default_path
+    code = run_with_backend(nil, backend: 'pi')
+
+    assert_equal 0, code
+    assert_includes @err.string, 'letsdo: running developer for TASK-1'
+    # The default pi backend runs via the fake pi (LETSDO_PI_COMMAND);
+    # its output goes to the streamer stdout.
+    assert_equal "Hello, world!\n", @out.string
+  end
+
+  private
+
+  # Runs one open task through the (default or injected) backend registry.
+  def run_with_backend(registry, backend:)
+    done_file = unique_done_file
+    with_project({ 'developer' => 'You are a developer.' }) do |root|
+      env = open_backlog_env(count: 1, done_file: done_file)
+            .merge('LETSDO_ROOT' => root, 'LETSDO_BACKEND' => backend)
+      builder_for(env, backend_registry: registry).run('developer')
+    end
+  end
+
+  def unique_done_file
+    File.join(Dir.mktmpdir('letsdo-done'), 'marker')
+  end
+
+  def builder_for(env, registry: nil, backend_registry: nil)
+    Letsdo::CLI::Builder.new(env: env, stdout: @out, stderr: @err, stdin: StringIO.new,
+                             sleeper: stop_on_first_wait, provider_registry: registry,
+                             backend_registry: backend_registry)
+  end
+
+  def custom_backend_registry(state)
+    { 'fake' => ->(_) { build_fake_factory(state) } }
+  end
+
+  def build_fake_factory(state)
+    lambda do |prompt:, streamer:, **_|
+      state[:built] += 1
+      Letsdo::Backends::Fake.new(prompt: prompt, streamer: streamer).tap do |fb|
+        fb.define_singleton_method(:run) do
+          state[:run] += 1
+          0
+        end
       end
     end
   end

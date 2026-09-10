@@ -14,7 +14,7 @@ class AgentLoopTest < Minitest::Test
       run_one: run_one, task_provider: provider,
       wait_seconds: opts.fetch(:wait_seconds, 0.5),
       sleeper: opts[:sleeper] || default_sleeper, stderr: stderr,
-      pause_gate: opts[:pause_gate]
+      pause_gate: opts[:pause_gate], agent: opts[:agent]
     )
     [loop_obj, stderr]
   end
@@ -242,6 +242,31 @@ class AgentLoopPauseTest < AgentLoopTest
     thread.join(5)
     refute thread.alive?, 'Letsdo::Stopped did not interrupt the gate wait'
     assert_includes stderr.string, 'letsdo: stopped'
+  end
+end
+
+require_relative 'helpers/fake_backend'
+
+# Factory injection: the loop stops the injected backend through the
+# generic protocol (terminate_now), not pi-specific calls.
+class AgentLoopBackendTerminationTest < AgentLoopTest
+  def test_on_signal_terminates_the_injected_backend
+    backend = Letsdo::Backends::Fake.new(prompt: 'x', streamer: nil)
+    agent = Struct.new(:backend).new(backend)
+    loop_obj, = make_loop(provider: -> { [] }, run_one: ->(_task) { 0 },
+                          agent: agent)
+
+    error = assert_raises(Letsdo::Stopped) { loop_obj.on_signal(2) }
+    assert_instance_of Letsdo::Stopped, error
+    assert backend.finished?, 'on_signal must terminate the backend via the protocol'
+  end
+
+  def test_on_signal_tolerates_missing_backend
+    agent = Struct.new(:backend).new(nil)
+    loop_obj, = make_loop(provider: -> { [] }, run_one: ->(_task) { 0 },
+                          agent: agent)
+
+    assert_raises(Letsdo::Stopped) { loop_obj.on_signal(2) }
   end
 end
 
