@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `letsdo doctor` — an environment self-check that prints one line per
+  check with a status tag (`[ OK ]` / `[WARN]` / `[FAIL]` / `[INFO]`) and an
+  actionable hint for every FAIL/WARN, exiting 0 when nothing FAILs and 1
+  otherwise. It checks the Ruby version (`>= 3.3`), the `pi` and `backlog`
+  commands (honoring `LETSDO_PI_COMMAND` / `LETSDO_BACKLOG_COMMAND`),
+  `backlog/tasks/` under `LETSDO_ROOT`, `AGENTS.md`, a non-empty `agents/`,
+  and whether stdout is a TTY. `doctor` is a reserved agent name: it always
+  runs the self-check and never launches an agent (TASK-71).
 - Agent prompts now carry the agent's own identity: on every
   `letsdo <name>` launch, letsdo prepends an identity block (agent name +
   backlog assignee handle) to the system prompt, whether the prompt comes

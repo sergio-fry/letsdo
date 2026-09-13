@@ -16,6 +16,8 @@
 # so the prompt can be customized before the first run).
 #
 # Usage:
+#   ./bin/letsdo doctor       # environment self-check, exit 0 unless a check FAILs;
+#                             #   'doctor' is reserved -- it never runs an agent
 #   ./bin/letsdo <name>       # run the <name> agent in the loop (exit 0 on stop)
 #   ./bin/letsdo <name> --init # create agents/<name>.md with the starter
 #                               #   default prompt, never run the agent (exit 0)

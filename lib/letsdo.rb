@@ -16,6 +16,7 @@
 #   Letsdo::RetryPolicy      - per-task retry/backoff/give-up policy (used at AgentLoop level)
 #   Letsdo::AgentLoop        - letsdo wiring: provider + agent + signals + messages
 #   Letsdo::Control          - agent-control primitives (PauseGate)
+#   Letsdo::Doctor           - `letsdo doctor` environment self-check
 #   Letsdo::Tui              - the interactive TUI (LogBuffer, Metrics,
 #                              Renderer, Terminal, Input, Session)
 #   Letsdo::CLI              - command-line arguments, usage, exit code
@@ -43,5 +44,6 @@ require_relative 'letsdo/session_recorder'
 require_relative 'letsdo/task_time_writeback'
 require_relative 'letsdo/metrics/fanout'
 require_relative 'letsdo/control'
+require_relative 'letsdo/doctor'
 require_relative 'letsdo/tui'
 require_relative 'letsdo/cli'

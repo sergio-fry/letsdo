@@ -12,6 +12,7 @@ orchestrator loop semantics, and how to run several agents at once.
 - [The interactive TUI](#the-interactive-tui)
 - [How the loop behaves](#how-the-loop-behaves)
 - [Running several agents](#running-several-agents)
+- [Environment self-check (doctor)](#environment-self-check-doctor)
 - [Exit codes](#exit-codes)
 - [Next steps](#next-steps)
 
@@ -220,12 +221,40 @@ They coordinate through the shared backlog — nothing else in common. Any
 number of agents can run simultaneously; the backlog folder is the single
 source of truth.
 
+## Environment self-check (doctor)
+
+`letsdo doctor` checks whether the environment can actually run the loop
+and prints one line per check with a status tag and an actionable hint:
+
+```
+$ letsdo doctor
+[ OK ] ruby 4.0.2 (>= 3.3)
+[ OK ] pi command found: pi
+[ OK ] backlog command found: backlog
+[ OK ] project root /home/user/backlog-project has backlog/tasks/
+[ OK ] AGENTS.md present at /home/user/backlog-project/AGENTS.md
+[ OK ] agents/ present with 1 prompt(s)
+[INFO] stdout is not a TTY - plain mode
+```
+
+Checks: Ruby version (`>= 3.3`), the `pi` command (`LETSDO_PI_COMMAND`),
+the `backlog` command (`LETSDO_BACKLOG_COMMAND`), `backlog/tasks/` under
+`LETSDO_ROOT`, `AGENTS.md`, a non-empty `agents/`, and whether stdout is a
+TTY (TUI vs plain mode). A missing command or project layout is a `[FAIL]`;
+a missing `AGENTS.md` or `agents/` is a `[WARN]`; the mode line is
+`[INFO]`. Every FAIL and WARN names the fix.
+
+It exits `0` when no check FAILs (warnings do not fail the run) and `1`
+otherwise. `doctor` is a reserved agent name: it always runs the self-check
+and never launches an agent.
+
 ## Exit codes
 
 | Code | Meaning |
 | --- | --- |
-| `0` | `--version` / `--help`; successful loop run and stop (incl. TUI `q`); `--init` created the prompt |
-| `1` | no arguments; unknown option; `--init` on an existing/unsafe name |
+| `0` | `--version` / `--help`; successful loop run and stop (incl. TUI `q`); `--init` created the prompt; `doctor` found no FAIL |
+| `1` | no arguments; unknown option; `--init` on an existing/unsafe name; `doctor` found at least one FAIL |
+| `2` | the AI backend command is missing (clean message, no backtrace) |
 
 ## Next steps
 

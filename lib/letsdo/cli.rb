@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'cli/init'
+require_relative 'cli/doctor'
 require_relative 'cli/builder'
 
 module Letsdo
@@ -10,6 +11,8 @@ module Letsdo
   #   letsdo                       — usage and agent list, exit code 1;
   #   letsdo --version             — version, exit code 0;
   #   letsdo --help                — usage, exit code 0;
+  #   letsdo doctor                — environment self-check, exit 0 unless a
+  #                                  check FAILs (then 1); `doctor` is reserved;
   #   letsdo <name>                — run the <name> agent in the orchestrator
   #                                    loop until SIGINT/SIGTERM;
   #   letsdo <name> (no prompt)    — same, but on the built-in default prompt;
@@ -21,6 +24,7 @@ module Letsdo
   #   letsdo <unknown option>      — "letsdo: unknown option: X" + usage, exit 1.
   class CLI
     include CLIInit
+    include CLIDoctor
 
     USAGE = 'Usage: letsdo <agent_name>'
     AGENTS_HEADER = 'Available agents:'
@@ -34,6 +38,8 @@ module Letsdo
     def initialize(env:, stdout:, stderr:, stdin: $stdin, sleeper: nil)
       @stdout = stdout
       @stderr = stderr
+      @env = env
+      @stdin = stdin
       @root = Config.new(env: env).root
       @builder = Builder.new(env: env, stdout: stdout, stderr: stderr,
                              stdin: stdin, sleeper: sleeper)
@@ -44,6 +50,7 @@ module Letsdo
       return print_version if version_flag?(arg)
       return print_help if help_flag?(arg)
       return usage_error if arg.nil?
+      return doctor_command if arg == 'doctor'
       return init_command(argv) if argv.include?('--init')
       return unknown_option(arg) if arg.start_with?('-')
 

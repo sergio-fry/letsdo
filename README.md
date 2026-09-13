@@ -153,12 +153,32 @@ The agent still runs — on the built-in default prompt. The notification is
 printed once per process. The looked-up path is exactly
 `<LETSDO_ROOT>/agents/<name>.md`.
 
+Not sure what is broken in the environment? Run the self-check:
+
+```
+$ letsdo doctor
+[ OK ] ruby 4.0.2 (>= 3.3)
+[ OK ] pi command found: pi
+[ OK ] backlog command found: backlog
+[ OK ] project root /home/user/backlog-project has backlog/tasks/
+[ OK ] AGENTS.md present at /home/user/backlog-project/AGENTS.md
+[ OK ] agents/ present with 1 prompt(s)
+[INFO] stdout is not a TTY - plain mode
+```
+
+One line per check with a status tag (`[ OK ]`, `[WARN]`, `[FAIL]`,
+`[INFO]`); every FAIL and WARN carries an actionable hint. It exits 1 when a
+check FAILs (0 otherwise, warnings included), so it can gate scripts.
+`doctor` is a reserved agent name — it always runs the self-check and never
+launches an agent.
+
 For the full walkthrough — install, session anatomy (plain and TUI), the
 loop/waiting model, exit codes — see the [usage guide](docs/usage.md).
 
 CLI reference:
 
 ```
+letsdo doctor              # environment self-check, exit 0 unless a check FAILs
 letsdo <name>              # run the <name> agent in the loop (exit 0 on stop)
 letsdo <name> --init       # create agents/<name>.md, never run the agent (exit 0)
 letsdo --init <name>       # same as above (flag-first form)

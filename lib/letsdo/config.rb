@@ -67,6 +67,13 @@ module Letsdo
       @env.fetch('LETSDO_BACKLOG_COMMAND', DEFAULT_BACKLOG_COMMAND)
     end
 
+    # Executable search path, used by `letsdo doctor` to resolve the
+    # configured command names. It lives here so doctor code never reads
+    # ENV directly (TASK-71).
+    def path
+      @env.fetch('PATH', '')
+    end
+
     # The task provider name. Reads LETSDO_PROVIDER with default 'backlog'.
     # An empty value falls back to 'backlog'.
     def provider
