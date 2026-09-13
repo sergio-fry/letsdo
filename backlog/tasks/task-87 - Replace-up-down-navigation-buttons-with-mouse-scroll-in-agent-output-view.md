@@ -1,9 +1,10 @@
 ---
 id: TASK-87
 title: Replace up/down navigation buttons with mouse scroll in agent output view
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-10 07:34'
+updated_date: '2026-09-13 13:29'
 labels: []
 dependencies: []
 priority: medium
@@ -24,3 +25,9 @@ In the agent output view (TUI / terminal UI), the current navigation uses up/dow
 - [ ] #3 Scroll behaves naturally — no jumpiness, follows standard terminal scroll behavior
 - [ ] #4 No regressions: all existing output content remains readable and accessible
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as not relevant (2026-09-13 review). The premise is incorrect: the TUI has no up/down navigation buttons — scrolling is keyboard-driven (arrow keys / PageUp / PageDown / Home / End), and removing keyboard navigation would be a regression. Mouse-wheel scrolling in a terminal also requires the user's terminal or tmux to enable mouse reporting, which is off by default in the primary tmux-over-SSH use case. Reopen as 'add optional mouse-wheel scroll, keep keyboard navigation' if the feature is wanted.
+<!-- SECTION:FINAL_SUMMARY:END -->

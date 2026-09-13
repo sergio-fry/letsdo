@@ -1,7 +1,3 @@
----
-model: free
----
-
 # Developer agent (developer)
 
 You are a developer agent named developer.

@@ -3,6 +3,7 @@
 require_relative 'test_helper'
 require 'stringio'
 require 'tempfile'
+require 'json'
 
 # CLI tests share stdout/stderr StringIOs and a fake-backlog env builder.
 # Each concern below is its own class so every class stays within the
@@ -156,6 +157,36 @@ class CliRunTest < CliTest
     assert_equal '', @out.string
   end
 
+  # Stop summary (TASK-69): plain mode prints it to stderr after the loop's
+  # own 'letsdo: stopped' line, so the plain stream stays otherwise identical.
+  def test_stop_summary_is_printed_after_stopped
+    code = run_developer(count: 1)
+
+    assert_equal 0, code
+    assert_includes @err.string, 'letsdo: session: 1 done, 0 failed, 0 interrupted'
+    stopped = @err.string.index('letsdo: stopped')
+    summary = @err.string.index('letsdo: session:')
+    assert_operator summary, :>, stopped, 'summary must follow the stopped line'
+  end
+
+  # LETSDO_METRICS_FILE (TASK-69): the recorder appends one JSON line per
+  # event to the configured path.
+  def test_metrics_file_records_jsonl_events
+    Tempfile.create('letsdo-metrics') do |file|
+      assert_equal 0, run_developer(count: 1, extra: { 'LETSDO_METRICS_FILE' => file.path })
+      events = metrics_events(file.path)
+      names = events.map { |event| event['event'] }
+
+      assert_equal 'session_start', names.first
+      assert_includes names, 'run_finished'
+      assert_equal 'session_stop', names.last
+    end
+  end
+
+  def metrics_events(path)
+    File.read(path).lines.map { |line| JSON.parse(line) }
+  end
+
   def test_injected_sleeper_is_honored_with_the_backlog_watcher
     # The CLI builds a default backlog watcher for the loop; an injected
     # control/stop sleeper must still win over the watcher idle path so the
@@ -263,7 +294,8 @@ class CliTuiTest < CliTest
     assert_includes tty_out.string, "\e[?1049h"
     assert_includes tty_out.string, "\e[?1049l"
     assert_includes tty_out.string, 'letsdo · developer (@developer)'
-    assert_empty @err.string
+    # The stop summary prints after the terminal is restored (TASK-69).
+    assert_includes @err.string, 'letsdo: session:'
   end
 
   # TUI quit raises Letsdo::Stopped in the main thread (TASK-79 regression):
@@ -274,7 +306,7 @@ class CliTuiTest < CliTest
 
     assert_equal 0, code
     assert_includes tty_out.string, "\e[?1049h"
-    assert_empty @err.string
+    assert_includes @err.string, 'letsdo: session:'
     refute_includes dumped, 'stream closed'
     refute_includes dumped, 'terminated with exception'
   end

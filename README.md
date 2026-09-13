@@ -189,7 +189,28 @@ All knobs are environment variables:
 | `LETSDO_BACKLOG_COMMAND` | `backlog` | The Backlog.md CLI command used as the task provider. |
 | `LETSDO_PROVIDER` | `backlog` | Task provider name used by the loop (currently only `backlog`). |
 | `LETSDO_BACKEND` | `pi` | AI backend that runs each agent (only `pi` today; `LETSDO_PI_COMMAND`/`LETSDO_PI_FLAGS` keep working as before). |
+| `LETSDO_METRICS_FILE` | — | Append session metrics as JSON Lines (`session_start`, one `run_finished` per task, `session_stop`) to this path. Unset disables the file. |
 | `LETSDO_DEBUG` | — | Set to `1` to trace loop decisions on stderr. |
+
+On stop, letsdo prints a session summary to stderr — done / failed /
+interrupted counts, open tasks left, total session time, time inside runs,
+the derived waiting time, the average done-run duration, and up to ten
+per-task lines (`TASK-42 done in 2m 10s`):
+
+```
+letsdo: session: 3 done, 1 failed, 0 interrupted, 4 left open, 12m 30s (8m 10s in runs, 4m 20s waiting, avg 2m 43s)
+letsdo:   TASK-12 done in 3m 5s
+letsdo:   TASK-13 failed in 1m 2s
+```
+
+The same summary prints in TUI mode after the terminal is restored, so a
+TUI session leaves the identical record on stderr. With
+`LETSDO_METRICS_FILE` set, the recorder also appends one JSON object per
+event — `session_start`, `run_finished` (`{task, exit, outcome,
+ elapsed_s, ts}`) and `session_stop` — flushing each line as it is written.
+An unwritable path only warns on stderr; the run continues without the
+file. `waiting` is a derived approximation (session time minus run time):
+it also covers polling and backlog reads, not only idle waiting.
 
 The comprehensive reference — every variable with defaults, precedences,
 examples and where each one is read — lives in the

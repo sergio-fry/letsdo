@@ -2,9 +2,10 @@
 id: TASK-86
 title: 'Spike: algorithmic task selection for agents — feasibility and requirements'
 status: To Do
-assignee: []
+assignee:
+  - '@analyst'
 created_date: '2026-09-10 07:27'
-updated_date: '2026-09-13 10:33'
+updated_date: '2026-09-13 13:29'
 labels: []
 dependencies: []
 priority: medium

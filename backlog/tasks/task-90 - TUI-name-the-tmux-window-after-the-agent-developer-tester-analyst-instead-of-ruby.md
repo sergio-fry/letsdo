@@ -4,8 +4,10 @@ title: >-
   TUI: name the tmux window after the agent (developer/tester/analyst) instead
   of "ruby"
 status: To Do
-assignee: []
+assignee:
+  - '@developer'
 created_date: '2026-09-13 11:34'
+updated_date: '2026-09-13 13:29'
 labels: []
 dependencies: []
 references:

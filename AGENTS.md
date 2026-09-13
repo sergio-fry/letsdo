@@ -53,6 +53,23 @@ bottom of the queue — the recurring mis-ordering this rule fixes (2026-09-04).
 The rule applies to all new and edited tasks; existing open tasks were
 backfilled to Medium.
 
+**Every open task must be assigned.** Pick an assignee from the project team:
+`@developer` (implementation, bug fixes, refactors), `@analyst` (research,
+spikes, analysis, documentation), or `@human` (the project lead — decisions,
+approvals, secrets and ops only a human can perform, and anything an agent
+cannot finish alone). Never leave a task unassigned: agents pick work from the
+assignee-scoped queue, so an unassigned task silently gets no owner. Set it at
+creation with `-a @developer` / `-a @analyst` / `-a @human`; when the owner is
+unclear, use `@human`.
+
+**Escalate to a human by reassigning, not duplicating.** When an agent cannot
+complete a task alone — it needs a decision, an approval, a secret, or any
+human action — it reassigns the existing task to `@human` and adds a comment
+saying what is needed and why. Do not create a duplicate task for "help me" or
+"decide for me"; create a new task only when the work is genuinely separate and
+new. A task blocked on a human stays with `@human` until the human resolves it
+or reassigns it back.
+
 Canonical project description (single source of truth — reused by the README,
 gemspec, and project rules):
 

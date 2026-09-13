@@ -1,7 +1,3 @@
----
-model: free
----
-
 # Analyst agent (analyst)
 
 You are an analyst agent named analyst. You work on analysis and design

@@ -144,17 +144,17 @@ class AgentLoopMetricsRecorder
     @events << [:start, task]
   end
 
-  def run_finished(_exit_code = nil)
-    @events << [:finish]
+  def run_finished(exit_code = nil)
+    @events << [:finish, exit_code]
   end
 end
 
 # TUI metrics facade events (TASK-42).
 class AgentLoopMetricsTest < AgentLoopTest
-  def make_loop_with_metrics(provider:, metrics:)
+  def make_loop_with_metrics(provider:, metrics:, run_one: ->(_task) { 0 })
     Letsdo::AgentLoop.new(
       name: 'developer', handle: '@developer', metrics: metrics,
-      run_one: ->(_task) { 0 }, task_provider: provider,
+      run_one: run_one, task_provider: provider,
       wait_seconds: 0.5, sleeper: default_sleeper, stderr: StringIO.new
     )
   end
@@ -164,7 +164,16 @@ class AgentLoopMetricsTest < AgentLoopTest
     make_loop_with_metrics(provider: once_provider([{ 'id' => 'TASK-1' }]),
                            metrics: metrics).run
 
-    assert_equal [[:provider, 1], [:start, 'TASK-1'], [:finish], [:provider, 0]],
+    assert_equal [[:provider, 1], [:start, 'TASK-1'], [:finish, 0], [:provider, 0]],
+                 metrics.events
+  end
+
+  def test_metrics_receives_the_run_exit_code
+    metrics = AgentLoopMetricsRecorder.new
+    make_loop_with_metrics(provider: once_provider([{ 'id' => 'TASK-1' }]),
+                           run_one: ->(_task) { 7 }, metrics: metrics).run
+
+    assert_equal [[:provider, 1], [:start, 'TASK-1'], [:finish, 7], [:provider, 0]],
                  metrics.events
   end
 

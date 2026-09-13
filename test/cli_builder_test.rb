@@ -86,7 +86,7 @@ class CliBuilderTest < Minitest::Test
       assert_equal 0, code
       assert_includes tty_out.string, "\e[?1049h"
       assert_includes tty_out.string, "\e[?1049l"
-      assert_empty @err.string
+      assert_includes @err.string, 'letsdo: session:'
     end
   end
 
@@ -270,5 +270,38 @@ class CliBuilderBackendTest < Minitest::Test
         end
       end
     end
+  end
+end
+
+# TUI 'r' refresh wiring (TASK-69): the refresh proc hands the fresh provider
+# count to the session recorder as well as returning it to the header.
+class CliBuilderRefreshTest < Minitest::Test
+  def test_refresh_forwards_the_provider_count_to_the_recorder
+    seen = []
+    refresh = builder.tui_refresh(-> { [1, 2, 3] }, recorder_into(seen))
+
+    assert_equal 3, refresh.call
+    assert_equal [3], seen
+  end
+
+  def test_refresh_forwards_nil_when_the_backlog_is_unreadable
+    seen = []
+    refresh = builder.tui_refresh(-> { nil }, recorder_into(seen))
+
+    assert_nil refresh.call
+    assert_equal [nil], seen
+  end
+
+  private
+
+  def recorder_into(seen)
+    recorder = Object.new
+    recorder.define_singleton_method(:provider_result) { |count| seen << count }
+    recorder
+  end
+
+  def builder
+    Letsdo::CLI::Builder.new(env: {}, stdout: StringIO.new, stderr: StringIO.new,
+                             stdin: StringIO.new)
   end
 end

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'json'
+require_relative 'session_recorder/jsonl_writer'
 
 module Letsdo
   # A mode-independent session metrics recorder. It receives the same
@@ -19,6 +19,50 @@ module Letsdo
 
     MAX_SUMMARY_RUNS = 10
 
+    HEADLINE = 'letsdo: session: %<done>d done, %<failed>d failed, ' \
+               '%<interrupted>d interrupted, %<left>s left open, %<session>s ' \
+               '(%<active>s in runs, %<waiting>s waiting, avg %<avg>s)'
+
+    # Rendering of the human-readable stop summary (TASK-63 C3). Kept nested
+    # so SessionRecorder stays within the class-length limit.
+    module SummaryFormat
+      private
+
+      def headline(summary)
+        left = summary.left.nil? ? 'unknown' : summary.left
+        format(HEADLINE, done: summary.done, failed: summary.failed,
+                         interrupted: summary.interrupted, left: left,
+                         session: format_duration(summary.session_s),
+                         active: format_duration(summary.active_s),
+                         waiting: format_duration(summary.waiting_s),
+                         avg: format_duration(summary.avg_s))
+      end
+
+      def run_lines(summary)
+        lines = summary.runs.first(MAX_SUMMARY_RUNS).map { |run| format_run(run) }
+        return lines unless summary.runs.length > MAX_SUMMARY_RUNS
+
+        lines << "letsdo:   … and #{summary.runs.length - MAX_SUMMARY_RUNS} more"
+      end
+
+      def format_run(run)
+        return "letsdo:   #{run.task_id} interrupted" if run.finished_mono.nil?
+
+        outcome = run.outcome == :done ? 'done' : 'failed'
+        "letsdo:   #{run.task_id} #{outcome} in #{format_duration(run.elapsed_s)}"
+      end
+
+      def format_duration(seconds)
+        total = [seconds.to_f, 0.0].max.round
+        minutes, secs = total.divmod(60)
+        return '0s' if minutes.zero? && secs.zero?
+        return "#{secs}s" if minutes.zero?
+
+        "#{minutes}m #{secs}s"
+      end
+    end
+    include SummaryFormat
+
     # @param name [String] agent name
     # @param handle [String] assignee handle
     # @param clock [Proc] monotonic clock -> seconds; default
@@ -31,13 +75,12 @@ module Letsdo
       @handle = handle
       @clock = clock || -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }
       @wall_clock = wall_clock || -> { Time.now.utc.iso8601 }
-      @metrics_io = metrics_io
+      @writer = JsonlWriter.new(metrics_io, name: name, handle: handle, wall_clock: @wall_clock)
       @mutex = Mutex.new
       @runs = []
       @left = nil
       @session_started = @clock.call
       @session_stopped = false
-      write_jsonl_event('session_start')
     end
 
     # A run started for a task.
@@ -60,11 +103,8 @@ module Letsdo
         run = @runs.reverse.find { |candidate| candidate.finished_mono.nil? }
         return unless run
 
-        run.finished_mono = @clock.call
-        run.elapsed_s = run.finished_mono - run.started_mono
-        run.exit_code = exit_code
-        run.outcome = exit_code == 0 ? :done : :failed
-        write_jsonl_event('run_finished', run)
+        close_run(run, exit_code)
+        @writer.run_finished(run)
       end
     end
 
@@ -79,27 +119,13 @@ module Letsdo
 
     # A point-in-time summary of the session metrics.
     #
+    # waiting_s is a derived approximation: session time minus the sum of
+    # run durations. It therefore also includes polling, backlog reads and
+    # stop overhead, not only idle waiting for new tasks.
+    #
     # @return [Summary] aggregate counts and durations
     def summary
-      @mutex.synchronize do
-        now = @clock.call
-        session_s = now - @session_started
-        active_s = @runs.sum { |run| run.elapsed_s || 0.0 }
-        done_runs = @runs.select { |run| run.outcome == :done }
-        avg_s = done_runs.empty? ? 0.0 : done_runs.sum { |run| run.elapsed_s || 0.0 } / done_runs.size
-
-        Summary.new(
-          done: @runs.count { |run| run.outcome == :done },
-          failed: @runs.count { |run| run.outcome == :failed },
-          interrupted: @runs.count { |run| run.finished_mono.nil? },
-          left: @left,
-          session_s: session_s,
-          active_s: active_s,
-          waiting_s: session_s - active_s,
-          avg_s: avg_s,
-          runs: @runs.dup
-        )
-      end
+      @mutex.synchronize { build_summary }
     end
 
     # Writes the session_stop JSONL event and returns the summary.
@@ -107,14 +133,10 @@ module Letsdo
     #
     # @return [Summary]
     def session_stop
-      write_event = false
-      @mutex.synchronize do
-        write_event = @metrics_io && !@session_stopped
-        @session_stopped = true
-      end
-      s = summary
-      write_jsonl_event('session_stop', s) if write_event
-      s
+      emit = claim_stop_event
+      result = summary
+      @writer.session_stop(result) if emit
+      result
     end
 
     # A human-readable summary suitable for stderr.
@@ -122,106 +144,48 @@ module Letsdo
     # @return [String]
     def summary_line
       s = summary
-      lines = []
-
-      left_text = s.left.nil? ? 'unknown' : s.left
-      lines << format(
-        'letsdo: session: %{done} done, %{failed} failed, %{interrupted} interrupted, ' \
-        '%{left} left open, %{session} (%{active} in runs, %{waiting} waiting, avg %{avg})',
-        done: s.done,
-        failed: s.failed,
-        interrupted: s.interrupted,
-        left: left_text,
-        session: format_duration(s.session_s),
-        active: format_duration(s.active_s),
-        waiting: format_duration(s.waiting_s),
-        avg: format_duration(s.avg_s)
-      )
-
-      s.runs.first(MAX_SUMMARY_RUNS).each do |run|
-        lines << format_run(run)
-      end
-
-      lines << "letsdo:   … and #{s.runs.length - MAX_SUMMARY_RUNS} more" if s.runs.length > MAX_SUMMARY_RUNS
-
+      lines = [headline(s)] + run_lines(s)
       lines.join("\n")
     end
 
     private
 
-    def format_run(run)
-      return "letsdo:   #{run.task_id} interrupted" if run.finished_mono.nil?
-
-      outcome = run.outcome == :done ? 'done' : 'failed'
-      "letsdo:   #{run.task_id} #{outcome} in #{format_duration(run.elapsed_s)}"
+    def close_run(run, exit_code)
+      run.finished_mono = @clock.call
+      run.elapsed_s = run.finished_mono - run.started_mono
+      run.exit_code = exit_code
+      run.outcome = exit_code&.zero? ? :done : :failed
     end
 
-    def format_duration(seconds)
-      total = [seconds.to_f, 0.0].max.round
-      minutes, secs = total.divmod(60)
-      return '0s' if minutes.zero? && secs.zero?
+    def build_summary
+      session_s = @clock.call - @session_started
+      active_s = @runs.sum { |run| run.elapsed_s || 0.0 }
+      Summary.new(
+        done: count_outcome(:done), failed: count_outcome(:failed),
+        interrupted: @runs.count { |run| run.finished_mono.nil? }, left: @left,
+        session_s: session_s, active_s: active_s, waiting_s: session_s - active_s,
+        avg_s: average_done_run, runs: @runs.dup
+      )
+    end
 
-      if minutes.positive?
-        "#{minutes}m #{secs}s"
-      else
-        "#{secs}s"
+    def count_outcome(outcome)
+      @runs.count { |run| run.outcome == outcome }
+    end
+
+    def average_done_run
+      done = @runs.select { |run| run.outcome == :done }
+      return 0.0 if done.empty?
+
+      done.sum { |run| run.elapsed_s || 0.0 } / done.size
+    end
+
+    def claim_stop_event
+      @mutex.synchronize do
+        return false if @session_stopped
+
+        @session_stopped = true
+        @writer.enabled?
       end
-    end
-
-    def write_jsonl_event(event, run_or_summary = nil)
-      return unless @metrics_io
-
-      payload = event_payload(event, run_or_summary)
-      return unless payload
-
-      @metrics_io.puts(JSON.generate(payload))
-      @metrics_io.flush if @metrics_io.respond_to?(:flush)
-    end
-
-    def event_payload(event, run_or_summary)
-      case event
-      when 'session_start'
-        session_start_payload
-      when 'run_finished'
-        run_finished_payload(run_or_summary)
-      when 'session_stop'
-        session_stop_payload(run_or_summary)
-      end
-    end
-
-    def session_start_payload
-      {
-        'event' => 'session_start',
-        'agent' => @name,
-        'handle' => @handle,
-        'ts' => @wall_clock.call
-      }
-    end
-
-    def run_finished_payload(run)
-      {
-        'event' => 'run_finished',
-        'task' => run.task_id,
-        'exit' => run.exit_code,
-        'outcome' => run.outcome.to_s,
-        'elapsed_s' => run.elapsed_s,
-        'ts' => @wall_clock.call
-      }
-    end
-
-    def session_stop_payload(summary)
-      {
-        'event' => 'session_stop',
-        'agent' => @name,
-        'handle' => @handle,
-        'ts' => @wall_clock.call,
-        'done' => summary.done,
-        'failed' => summary.failed,
-        'interrupted' => summary.interrupted,
-        'left' => summary.left,
-        'session_s' => summary.session_s,
-        'runs_s' => summary.active_s
-      }
     end
   end
 end

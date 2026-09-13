@@ -41,15 +41,19 @@ class ProvidersBacklogTest < Minitest::Test
   # The real CLI returns extra keys (type, reporter, labels, milestone,
   # parentTaskId, ordinal, createdAt, updatedAt); the adapter must project
   # them away instead of splatting them into Task.new (TASK-91).
-  def test_full_real_schema_is_normalized_and_extra_keys_ignored
-    tasks = call_provider(scenario: 'open', count: 1)
-    task = tasks.first
+  def test_full_real_schema_is_normalized
+    task = call_provider(scenario: 'open', count: 1).first
 
     assert_equal 'TASK-1', task.id
     assert_equal 'Alpha', task.title
     assert_equal 'To Do', task.status
     assert_nil task.priority
     assert_equal ['@developer'], task.assignees
+  end
+
+  def test_unknown_schema_keys_are_not_exposed
+    task = call_provider(scenario: 'open', count: 1).first
+
     refute task.respond_to?(:type)
     refute task.respond_to?(:reporter)
     refute task.respond_to?(:labels)

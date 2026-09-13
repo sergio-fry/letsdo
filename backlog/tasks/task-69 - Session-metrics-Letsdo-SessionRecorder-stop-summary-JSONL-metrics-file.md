@@ -1,10 +1,11 @@
 ---
 id: TASK-69
 title: 'Session metrics: Letsdo::SessionRecorder, stop summary, JSONL metrics file'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@developer'
 created_date: '2026-09-04 08:10'
-updated_date: '2026-09-13 12:23'
+updated_date: '2026-09-13 13:47'
 labels: []
 dependencies:
   - TASK-42
@@ -21,12 +22,12 @@ Implement the session-metrics design from TASK-63 (design comments C1-C3; read t
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Letsdo::SessionRecorder (lib/letsdo/session_recorder.rb) is mode-independent (no tui/ deps), thread-safe, with injectable monotonic + wall clocks: run records {task_id, started_mono, finished_mono, elapsed_s, exit_code}; provider_result(count) tracks latest left (nil = unreadable); outcome exit==0 → done, exit!=0 → failed; a record still open when summary is requested → interrupted; summary aggregates done/failed/interrupted/left/session_s/active_s (= sum of runs)/waiting_s (= session − active, documented approximation)/avg over done runs; summary_line prints the TASK-63 C3 format with ≤10 per-run lines then '… and N more'
-- [ ] #2 AgentLoop passes the exit code to metrics: wrapped_run's ensure calls @metrics&.run_finished(code); Tui::Metrics#run_finished(exit_code = nil) ignores the argument (header behavior unchanged); the agent_loop_test stub MetricsRecorder#run_finished gains the optional param; lib/letsdo/loop.rb has no diff
-- [ ] #3 CLI wires the recorder in both modes: plain — metrics: recorder; TUI — metrics: Letsdo::Metrics::Fanout.new(recorder, tui_metrics) (lib/letsdo/metrics/fanout.rb forwards provider_result/run_started/run_finished to each observer); the TUI 'r' refresh proc also feeds recorder.provider_result. After the loop/session ends, CLI prints recorder.summary_line to real stderr — plain after 'letsdo: stopped', TUI after terminal restore
-- [ ] #4 LETSDO_METRICS_FILE: when set, CLI opens the path in append mode and hands the IO to the recorder; the recorder writes one JSON line per event (session_start / run_finished {task, exit, outcome, elapsed_s, ts} / session_stop) with ISO8601 UTC wall timestamps and monotonic durations, flushing per line; env unset → no file, no behavior change; invalid/unwritable path → stderr warning, run continues without the file
-- [ ] #5 Tests: new session_recorder_test.rb (fake clocks — durations, done/failed/interrupted classification, left + nil, waiting derivation, summary format + cap, JSONL via StringIO), fanout unit test, agent_loop_test (exit code forwarded), cli_test updated (summary line present in plain output; LETSDO_METRICS_FILE via tempfile), tui_metrics_test semantics unchanged; no real TTY anywhere; rake test 0 failures; rubocop 0 offenses
-- [ ] #6 All texts English (TASK-35); plain non-TTY output byte-identical to today except the added summary line(s) after 'letsdo: stopped'; README documents LETSDO_METRICS_FILE and the stop summary
+- [x] #1 Letsdo::SessionRecorder (lib/letsdo/session_recorder.rb) is mode-independent (no tui/ deps), thread-safe, with injectable monotonic + wall clocks: run records {task_id, started_mono, finished_mono, elapsed_s, exit_code}; provider_result(count) tracks latest left (nil = unreadable); outcome exit==0 → done, exit!=0 → failed; a record still open when summary is requested → interrupted; summary aggregates done/failed/interrupted/left/session_s/active_s (= sum of runs)/waiting_s (= session − active, documented approximation)/avg over done runs; summary_line prints the TASK-63 C3 format with ≤10 per-run lines then '… and N more'
+- [x] #2 AgentLoop passes the exit code to metrics: wrapped_run's ensure calls @metrics&.run_finished(code); Tui::Metrics#run_finished(exit_code = nil) ignores the argument (header behavior unchanged); the agent_loop_test stub MetricsRecorder#run_finished gains the optional param; lib/letsdo/loop.rb has no diff
+- [x] #3 CLI wires the recorder in both modes: plain — metrics: recorder; TUI — metrics: Letsdo::Metrics::Fanout.new(recorder, tui_metrics) (lib/letsdo/metrics/fanout.rb forwards provider_result/run_started/run_finished to each observer); the TUI 'r' refresh proc also feeds recorder.provider_result. After the loop/session ends, CLI prints recorder.summary_line to real stderr — plain after 'letsdo: stopped', TUI after terminal restore
+- [x] #4 LETSDO_METRICS_FILE: when set, CLI opens the path in append mode and hands the IO to the recorder; the recorder writes one JSON line per event (session_start / run_finished {task, exit, outcome, elapsed_s, ts} / session_stop) with ISO8601 UTC wall timestamps and monotonic durations, flushing per line; env unset → no file, no behavior change; invalid/unwritable path → stderr warning, run continues without the file
+- [x] #5 Tests: new session_recorder_test.rb (fake clocks — durations, done/failed/interrupted classification, left + nil, waiting derivation, summary format + cap, JSONL via StringIO), fanout unit test, agent_loop_test (exit code forwarded), cli_test updated (summary line present in plain output; LETSDO_METRICS_FILE via tempfile), tui_metrics_test semantics unchanged; no real TTY anywhere; rake test 0 failures; rubocop 0 offenses
+- [x] #6 All texts English (TASK-35); plain non-TTY output byte-identical to today except the added summary line(s) after 'letsdo: stopped'; README documents LETSDO_METRICS_FILE and the stop summary
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -39,4 +40,16 @@ Implement the session-metrics design from TASK-63 (design comments C1-C3; read t
 
 <!-- SECTION:NOTES:BEGIN -->
 Created SessionRecorder class (mode-independent, thread-safe, JSONL output, summary aggregation); wired into CLI Builder for plain mode (metrics: recorder) and TUI mode (Fanout wrapping recorder + Tui::Metrics); added LETSDO_METRICS_FILE handling; modified run_finished signature in Tui::Metrics and AgentLoop ensure block; updated lib/letsdo.rb requires.
+
+Review pass 2026-09-13: the implementation is committed (SessionRecorder, Fanout, CLI wiring, LETSDO_METRICS_FILE) but the task is NOT complete. `rake test` fails 3 tests because TUI-mode tests still assert empty stderr while the stop summary line now prints there: CliBuilderTest#test_tui_run_engages_through_the_builder, CliTuiTest#test_tui_engages_with_real_terminals_and_quits_cleanly, CliTuiTest#test_tui_quit_prints_no_open3_thread_noise. Remaining work: update those 3 tests to expect the summary line, then verify ACs #1-#6 and finalize.
+
+Continuation review (this run) audited all ACs vs the committed implementation. Beyond the 3 known TUI-test failures, found: (a) AC#3 TUI 'r' refresh proc did not feed recorder.provider_result; (b) AC#5 missing agent_loop_test exit-code-forwarding assertion and cli_test plain summary + LETSDO_METRICS_FILE tempfile assertions; (c) AC#6 README lacked LETSDO_METRICS_FILE and stop-summary docs. Plan for this run: fix the 3 TUI tests to expect the summary line; wire recorder.provider_result into the TUI refresh lambda; add the missing agent_loop/cli tests; document LETSDO_METRICS_FILE + stop summary in README; run rake test + rubocop; then verify ACs and finalize.
+
+Continuation complete (2026-09-13). Fixed the 3 TUI tests to expect the post-restore stop summary; wired the TUI 'r' refresh lambda to feed recorder.provider_result; added the missing AC#5 tests (agent_loop_test exit-code forwarding, cli_test plain summary + LETSDO_METRICS_FILE tempfile, cli_builder_test refresh forwarding); documented LETSDO_METRICS_FILE and the stop summary in README; and made the whole tree RuboCop-clean under the CI-pinned 1.77.0 default config by extracting BuilderRegistries/BuilderAssembly/BuilderMetrics, SessionRecorder::JsonlWriter, SessionRecorder::SummaryFormat and splitting oversized test classes. Evidence: rake test -> 326 runs, 925 assertions, 0 failures, 0 errors; rubocop _1.77.0_ --no-server lib bin test -> 67 files, no offenses; manual plain-mode smoke run with LETSDO_METRICS_FILE emitted session_start/run_finished/session_stop JSONL (ISO8601 UTC ts, monotonic elapsed_s), printed the summary after 'letsdo: stopped', and left stdout unchanged; lib/letsdo/loop.rb has no diff.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Completed the TASK-63 session-metrics design. Letsdo::SessionRecorder (mode-independent, mutex-guarded, injectable monotonic+wall clocks) records per-run duration/exit/outcome, tracks the latest 'left' count, classifies an open run as interrupted, and renders the capped stop summary. AgentLoop now forwards the run exit code via run_finished(code); Tui::Metrics ignores it, so the header is unchanged and lib/letsdo/loop.rb stays diff-free. The CLI wires the recorder directly in plain mode and through Metrics::Fanout(recorder, Tui::Metrics) in TUI mode; the TUI 'r' refresh also feeds the recorder. The stop summary prints to stderr after 'letsdo: stopped' (plain) and after terminal restore (TUI). LETSDO_METRICS_FILE appends one flushed JSON line per session_start/run_finished/session_stop event with ISO8601 UTC timestamps and monotonic durations; an invalid path only warns. Verified: rake test 326 runs / 0 failures, rubocop 1.77.0 (CI-pinned, default config) 0 offenses over lib bin test, and a manual plain-mode run showing the summary plus a well-formed JSONL file while stdout stayed byte-identical. README documents the env var and the summary.
+<!-- SECTION:FINAL_SUMMARY:END -->
