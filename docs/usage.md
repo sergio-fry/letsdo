@@ -126,9 +126,12 @@ plain line stream:
   letsdo: developer has 3 open task(s)
   letsdo: running developer for TASK-42
   letsdo: no open tasks for developer, retrying in 10s
-  letsdo: backlog unavailable, retrying in 10s
+  letsdo: backlog unavailable, retrying in 10s - run `letsdo doctor` to diagnose
   letsdo: stopped
   ```
+
+  When the backlog stays unreadable, only the first message of a run
+  carries the `letsdo doctor` hint; later retries repeat the short line.
 
 Stop the loop with `Ctrl+C` (`SIGINT`; `SIGTERM` and `SIGHUP` — terminal
 closed — work too) — a running pi child is terminated and the process

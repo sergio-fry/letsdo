@@ -175,7 +175,9 @@ One line per check with a status tag (`[ OK ]`, `[WARN]`, `[FAIL]`,
 `[INFO]`); every FAIL and WARN carries an actionable hint. It exits 1 when a
 check FAILs (0 otherwise, warnings included), so it can gate scripts.
 `doctor` is a reserved agent name — it always runs the self-check and never
-launches an agent.
+launches an agent. When the loop cannot read the backlog, its first
+`backlog unavailable` message of a run points at `letsdo doctor`, so the
+cause is one command away.
 
 For the full walkthrough — install, session anatomy (plain and TUI), the
 loop/waiting model, exit codes — see the [usage guide](docs/usage.md).

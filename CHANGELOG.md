@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (quit, stop signal, crash). Outside tmux nothing extra is written and the
   tmux binary is never invoked (TASK-90).
 
+### Changed
+
+- When the backlog cannot be read, the loop's first "backlog unavailable"
+  message of a run now points at `letsdo doctor`; later retries keep the
+  short line, so a long outage does not repeat the hint forever (TASK-93).
+
 ## [0.4.0] - 2026-09-08
 
 ### Changed

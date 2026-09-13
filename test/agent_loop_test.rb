@@ -101,7 +101,33 @@ class AgentLoopRunTest < AgentLoopTest
 
     assert_equal 0, loop_obj.run
     assert_empty runs
-    assert_includes stderr.string, 'letsdo: backlog unavailable, retrying in 0.5s'
+    assert_includes stderr.string,
+                    'letsdo: backlog unavailable, retrying in 0.5s - ' \
+                    'run `letsdo doctor` to diagnose'
+  end
+
+  def test_doctor_hint_only_on_the_first_unavailable_message
+    runs = []
+    loop_obj, stderr = make_loop(provider: -> { nil }, run_one: counting_runner(runs),
+                                 sleeper: counting_sleeper(max_sleeps: 2))
+
+    assert_equal 0, loop_obj.run
+    assert_empty runs
+    lines = stderr.string.lines.grep(/backlog unavailable/)
+    assert_equal 2, lines.length
+    assert_equal 'letsdo: backlog unavailable, retrying in 0.5s - ' \
+                 "run `letsdo doctor` to diagnose\n", lines.first
+    assert_equal "letsdo: backlog unavailable, retrying in 0.5s\n", lines.last
+  end
+
+  def test_doctor_hint_returns_in_a_new_run
+    loop_obj, stderr = make_loop(provider: -> { nil }, run_one: ->(_task) { 0 },
+                                 sleeper: counting_sleeper(max_sleeps: 2))
+
+    loop_obj.run
+    loop_obj.run
+
+    assert_equal 2, stderr.string.lines.grep(/run `letsdo doctor` to diagnose/).length
   end
 
   def test_sleeper_receives_wait_seconds

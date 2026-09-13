@@ -18,8 +18,7 @@ module Letsdo
     end
 
     def run
-      @loop = build_loop
-      install_signal_handlers
+      prepare_run
       debug("loop start (agent=#{@name}, handle=#{@handle}, wait=#{@wait_seconds}s)")
       run_until_stopped
       debug('loop stopped')
@@ -28,6 +27,15 @@ module Letsdo
     ensure
       close_watcher
       restore_signal_handlers
+    end
+
+    # The `letsdo doctor` hint rides on the first unavailable backlog call
+    # of a run only: later nils repeat the same diagnosis, and a wall of
+    # hints would just add noise (TASK-93).
+    def unavailable_message
+      hint = @unavailable_hinted ? '' : ' - run `letsdo doctor` to diagnose'
+      @unavailable_hinted = true
+      "letsdo: backlog unavailable, retrying in #{@wait_seconds}s#{hint}"
     end
 
     def close_watcher
@@ -59,6 +67,12 @@ module Letsdo
       @retry_policy = build_retry_policy(opts)
       @last_attempted = {}
       assign_control_opts(opts)
+    end
+
+    def prepare_run
+      @loop = build_loop
+      install_signal_handlers
+      @unavailable_hinted = false
     end
 
     def build_retry_policy(opts)

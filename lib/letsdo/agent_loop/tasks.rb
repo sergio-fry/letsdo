@@ -53,7 +53,7 @@ module Letsdo
 
     def provider_unavailable
       debug('provider: backlog unavailable')
-      @stderr.puts("letsdo: backlog unavailable, retrying in #{@wait_seconds}s")
+      @stderr.puts(unavailable_message)
       @metrics&.provider_result(nil)
       nil
     end
