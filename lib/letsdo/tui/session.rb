@@ -25,13 +25,14 @@ module Letsdo
       def run(&work)
         install_winch_handler
         @terminal.enter
-        run_work(&work)
+        result = run_work(&work)
+        raise_input_error!
+        result
       rescue Letsdo::Stopped
+        raise_input_error!
         0
       ensure
-        stop_input_thread
-        leave_terminal
-        restore_winch_handler
+        restore_terminal
       end
 
       def run_work(&work)
@@ -39,6 +40,23 @@ module Letsdo
           start_input_thread
           work.call
         end
+      end
+
+      # Re-raises a failure captured by the background input/render thread
+      # so a paint or input error is never silently swallowed into a blank,
+      # unresponsive TUI (TASK-92). Called after the work ends, on both the
+      # normal and the stopped path, before the ensure restores the terminal;
+      # the error therefore propagates only once the alternate screen is left.
+      #
+      # A fresh instance is raised rather than the captured object: quit
+      # interrupts the main thread from inside the input thread's rescue, so
+      # the injected Letsdo::Stopped already carries the captured error as its
+      # cause, and re-raising that object would form a circular cause chain.
+      def raise_input_error!
+        return unless @input_error
+
+        error = @input_error
+        raise error.class, error.message, error.backtrace
       end
 
       private
@@ -72,6 +90,7 @@ module Letsdo
         @body_height = 1
         @seen_version = 0
         @input_thread = nil
+        @input_error = nil
       end
 
       # Enters raw mode on the keyboard for the duration of the block. Held
@@ -110,6 +129,14 @@ module Letsdo
         return unless thread
 
         thread.join(INPUT_JOIN_TIMEOUT) || thread.kill
+      end
+
+      # Runs the full terminal cleanup on every exit path: stops the input
+      # thread, leaves the alternate screen and restores the SIGWINCH handler.
+      def restore_terminal
+        stop_input_thread
+        leave_terminal
+        restore_winch_handler
       end
 
       def leave_terminal

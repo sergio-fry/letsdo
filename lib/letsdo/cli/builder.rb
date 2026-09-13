@@ -27,9 +27,18 @@ module Letsdo
         clock = -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }
         handle = assignee_handle(name)
         log = Tui::LogBuffer.new
+        tui_parts_hash(name, recorder, clock, handle, log)
+      end
+
+      # Assembles the parts hash. The header facade (Tui::Metrics — the only
+      # object answering #snapshot, which the renderer needs) and the Fanout
+      # that forwards loop events to both recorder and header share the same
+      # header instance (TASK-92).
+      def tui_parts_hash(name, recorder, clock, handle, log)
+        header = tui_metrics(name, handle, clock, log)
         {
-          clock: clock, handle: handle, log: log,
-          metrics: Letsdo::Metrics::Fanout.new(recorder, tui_metrics(name, handle, clock, log)),
+          clock: clock, handle: handle, log: log, header: header,
+          metrics: Letsdo::Metrics::Fanout.new(recorder, header),
           agent: agent_for(name, OutputStreamer.new(log: log)),
           provider: provider_for(handle),
           pause_gate: Control::PauseGate.new
@@ -49,7 +58,7 @@ module Letsdo
 
       def tui_session_args(name, **parts)
         {
-          name: name, handle: parts[:handle], log: parts[:log], metrics: parts[:metrics],
+          name: name, handle: parts[:handle], log: parts[:log], metrics: parts[:header],
           terminal: Tui::Terminal.new(stream: @stdout),
           input: Tui::Input.new(stdin: @stdin),
           refresh: -> { tasks = parts[:provider].call; tasks ? tasks.length : nil },

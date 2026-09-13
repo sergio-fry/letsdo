@@ -10,8 +10,16 @@ module Letsdo
         repaint
         @last_repaint = @clock.call
         loop { break if @stop || !poll_once }
-      rescue StandardError
-        nil
+      rescue Letsdo::Stopped
+        raise
+      rescue StandardError => e
+        # A paint/input/resize failure here must not leave a blank,
+        # unresponsive TUI: record it and interrupt the run so it is surfaced
+        # after the terminal is restored (TASK-92).
+        return if @stop
+
+        @input_error = e
+        quit
       end
 
       def poll_once

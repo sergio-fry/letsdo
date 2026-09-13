@@ -336,3 +336,56 @@ class TuiSessionRawModeTest < TuiSessionTest
     assert_equal 1, @input.stdin.raw_exits
   end
 end
+
+# A paint failure inside the background input/render thread must not leave a
+# blank, unresponsive TUI: it interrupts the run, restores the terminal and
+# surfaces the original error (TASK-92).
+class TuiSessionInputErrorTest < TuiSessionTest
+  def build_session(terminal, input)
+    Letsdo::Tui::Session.new(
+      name: 'developer', handle: '@developer', log: @log, metrics: @metrics,
+      terminal: terminal, input: input, wait_seconds: 10, clock: -> { @clock }
+    )
+  end
+
+  # Terminal whose size query raises on the given call (1 = the first repaint,
+  # 2 = a later repaint) — stands in for any error raised while painting.
+  def failing_terminal(raise_on_call: 1)
+    calls = 0
+    provider = lambda do
+      calls += 1
+      raise 'render exploded' if calls >= raise_on_call
+
+      [8, 60]
+    end
+    Letsdo::Tui::Terminal.new(stream: @terminal_io, size_provider: provider)
+  end
+
+  def test_paint_error_mid_run_interrupts_the_work_and_surfaces_the_error
+    session = build_session(failing_terminal(raise_on_call: 2), input_for('r'))
+
+    error = assert_raises(RuntimeError) do
+      session.run do
+        sleep 5
+        flunk('the work must be interrupted by the paint failure')
+      end
+    end
+
+    assert_equal 'render exploded', error.message
+    assert_includes @terminal_io.string, LEAVE_ALT
+  end
+
+  def test_first_frame_paint_error_surfaces_and_restores_the_terminal
+    @input = ScriptedRawInput.new([])
+    session = build_session(failing_terminal, @input)
+
+    error = assert_raises(RuntimeError) do
+      session.run { sleep 5 }
+    end
+
+    assert_equal 'render exploded', error.message
+    assert_equal 1, @input.stdin.raw_enters
+    assert_equal 1, @input.stdin.raw_exits
+    assert_includes @terminal_io.string, LEAVE_ALT
+  end
+end

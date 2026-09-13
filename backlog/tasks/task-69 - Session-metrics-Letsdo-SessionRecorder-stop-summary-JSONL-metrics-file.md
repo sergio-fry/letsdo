@@ -1,11 +1,10 @@
 ---
 id: TASK-69
 title: 'Session metrics: Letsdo::SessionRecorder, stop summary, JSONL metrics file'
-status: In Progress
-assignee:
-  - '@developer'
+status: To Do
+assignee: []
 created_date: '2026-09-04 08:10'
-updated_date: '2026-09-10 22:19'
+updated_date: '2026-09-13 12:23'
 labels: []
 dependencies:
   - TASK-42
