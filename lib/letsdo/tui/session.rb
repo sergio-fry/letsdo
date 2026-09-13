@@ -2,6 +2,7 @@
 
 require_relative 'session/keys'
 require_relative 'session/view'
+require_relative 'session/terminal'
 
 module Letsdo
   module Tui
@@ -10,6 +11,7 @@ module Letsdo
     class Session
       include SessionKeys
       include SessionView
+      include SessionTerminal
 
       REPAINT_INTERVAL = 1.0
       IDLE_SLEEP = 0.01
@@ -23,8 +25,7 @@ module Letsdo
       end
 
       def run(&work)
-        install_winch_handler
-        @terminal.enter
+        install_terminal
         result = run_work(&work)
         raise_input_error!
         result
@@ -71,6 +72,7 @@ module Letsdo
       def assign_io(opts)
         @terminal = opts.fetch(:terminal)
         @input = opts.fetch(:input)
+        @title = opts[:title]
         @refresh = opts[:refresh]
         @wait_seconds = opts.fetch(:wait_seconds, 10.0)
         @clock = opts[:clock] || -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }
@@ -105,18 +107,6 @@ module Letsdo
         end
       end
 
-      def install_winch_handler
-        Signal.trap('SIGWINCH') { @winch = true }
-      rescue ArgumentError
-        nil
-      end
-
-      def restore_winch_handler
-        Signal.trap('SIGWINCH', 'DEFAULT')
-      rescue ArgumentError
-        nil
-      end
-
       def start_input_thread
         @input_thread = Thread.new { input_loop }
         @input_thread.report_on_exception = false
@@ -129,18 +119,6 @@ module Letsdo
         return unless thread
 
         thread.join(INPUT_JOIN_TIMEOUT) || thread.kill
-      end
-
-      # Runs the full terminal cleanup on every exit path: stops the input
-      # thread, leaves the alternate screen and restores the SIGWINCH handler.
-      def restore_terminal
-        stop_input_thread
-        leave_terminal
-        restore_winch_handler
-      end
-
-      def leave_terminal
-        @terminal.leave
       end
     end
   end

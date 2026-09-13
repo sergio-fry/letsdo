@@ -90,6 +90,21 @@ class CliBuilderTest < Minitest::Test
     end
   end
 
+  # The TUI session args carry the tmux window-title component built from the
+  # injected stdout/env, so `letsdo <name>` labels its tmux window (TASK-90).
+  def test_tui_session_args_carry_the_window_title
+    with_project({ 'developer' => 'You are a developer.' }) do |root|
+      env = { 'TERM' => 'xterm', 'TMUX' => '/tmp/tmux-0/default,1,0', 'TMUX_PANE' => '%1' }
+      subject = tui_builder(root, stdout: FakeTtyOut.new, stdin: FakeTtyIn.new('q'), env: env)
+      parts = { handle: '@developer', header: nil, refresh: nil, clock: nil,
+                pause_gate: nil, agent: nil }
+      args = subject.tui_session_args('developer', **parts)
+
+      assert_instance_of Letsdo::Tui::WindowTitle, args[:title]
+      assert args[:title].tmux?
+    end
+  end
+
   def test_run_notifies_once_for_a_missing_prompt
     with_project({}) do |root|
       code = builder(root, env: fake_backlog_env).run('ghost')

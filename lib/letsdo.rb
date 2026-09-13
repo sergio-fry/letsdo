@@ -18,7 +18,7 @@
 #   Letsdo::Control          - agent-control primitives (PauseGate, Reader)
 #   Letsdo::Doctor           - `letsdo doctor` environment self-check
 #   Letsdo::Tui              - the interactive TUI (LogBuffer, Metrics,
-#                              Renderer, Terminal, Input, Session)
+#                              Renderer, Terminal, WindowTitle, Input, Session)
 #   Letsdo::CLI              - command-line arguments, usage, exit code
 #
 # Entry point — bin/letsdo (a thin wrapper over Letsdo::CLI).

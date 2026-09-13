@@ -389,3 +389,51 @@ class TuiSessionInputErrorTest < TuiSessionTest
     assert_includes @terminal_io.string, LEAVE_ALT
   end
 end
+
+# The tmux window label is installed for the session and restored on every
+# exit path — quit, stop signal and a raised work block (TASK-90).
+class TuiSessionTitleTest < TuiSessionTest
+  class RecordingTitle
+    attr_reader :calls
+
+    def initialize
+      @calls = []
+    end
+
+    def install(name)
+      @calls << [:install, name]
+    end
+
+    def restore
+      @calls << :restore
+    end
+  end
+
+  def run_titled_session(keys, &work)
+    @title = RecordingTitle.new
+    session = Letsdo::Tui::Session.new(
+      name: 'developer', handle: '@developer', log: @log, metrics: @metrics,
+      terminal: terminal, input: input_for(keys), title: @title,
+      wait_seconds: 10, clock: -> { @clock }
+    )
+    session.run(&work)
+  end
+
+  def test_the_agent_name_is_installed_and_restored_after_a_quit
+    run_titled_session('q') { sleep 0.5 }
+
+    assert_equal [[:install, 'developer'], :restore], @title.calls
+  end
+
+  def test_the_title_is_restored_on_a_stop
+    run_titled_session([]) { raise Letsdo::Stopped }
+
+    assert_equal [[:install, 'developer'], :restore], @title.calls
+  end
+
+  def test_the_title_is_restored_when_the_work_raises
+    assert_raises(RuntimeError) { run_titled_session('') { raise 'boom' } }
+
+    assert_equal [:restore], @title.calls.last(1)
+  end
+end

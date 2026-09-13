@@ -193,7 +193,10 @@ Keys:
 
 Resizes (`SIGWINCH`) repaint the frame without corruption. Every exit path —
 quit, signal, agent loop end — restores the terminal (alternate screen
-left, cursor back). The TUI only renders when it is safe to do so; in any
+left, cursor back). Inside tmux the window is labeled with the agent name
+for the whole session, so side-by-side agent panes stay distinguishable;
+the previous label (and automatic-rename) returns on exit. The TUI only
+renders when it is safe to do so; in any
 other context the output is byte-identical to the plain line stream, which
 is what keeps CI and pipes deterministic.
 
@@ -238,6 +241,13 @@ letsdo analyst   &   # works on @analyst tasks
 They coordinate through the shared backlog — nothing else in common. Any
 number of agents can run simultaneously; the backlog folder is the single
 source of truth.
+
+When the agents run in tmux panes, a TUI session labels its window with the
+agent name (`letsdo developer` → window `developer`) and restores the
+previous label on exit. tmux's automatic-rename is disabled for the session
+and restored afterwards, so the label stays put instead of being overwritten
+with the process name (`ruby`). Outside tmux nothing is written and the tmux
+binary is never invoked.
 
 ## Environment self-check (doctor)
 

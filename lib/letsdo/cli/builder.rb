@@ -78,6 +78,7 @@ module Letsdo
           name: name, handle: parts[:handle], log: parts[:log], metrics: parts[:header],
           terminal: Tui::Terminal.new(stream: @stdout),
           input: Tui::Input.new(stdin: @stdin),
+          title: Tui::WindowTitle.new(stream: @stdout, env: @env),
           refresh: parts[:refresh],
           wait_seconds: wait_seconds, clock: parts[:clock],
           pause_gate: parts[:pause_gate], runner: -> { parts[:agent].backend }

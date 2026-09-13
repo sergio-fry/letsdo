@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cleanly (exit 0), while the output stays a plain byte stream. With a
   piped or `/dev/null` stdin the reader is never started, so stopping stays
   signal-only (`SIGINT`/`SIGTERM`/`SIGHUP`) (TASK-75).
+- Inside tmux, a TUI session now labels its window with the agent name
+  (`letsdo developer` → window `developer`) instead of the process name
+  tmux's automatic-rename derives (`ruby`), so side-by-side agent panes are
+  distinguishable. automatic-rename is disabled for the session and
+  restored, together with the previous window label, on every exit path
+  (quit, stop signal, crash). Outside tmux nothing extra is written and the
+  tmux binary is never invoked (TASK-90).
 
 ## [0.4.0] - 2026-09-08
 
