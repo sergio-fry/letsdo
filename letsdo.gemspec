@@ -40,8 +40,10 @@ Gem::Specification.new do |spec|
   # The AI backend is the external `pi` CLI (default, overridable via
   # LETSDO_PI_COMMAND) — a runtime *requirement*, not a rubygem, so it is
   # documented in the README rather than declared as a dependency.
+  # User-facing guides live in docs/ and are linked from the README, so
+  # they must ship inside the gem for installed copies to be self-contained.
   spec.files         = Dir["lib/**/*.rb", "README.md", "LICENSE",
-                           "CHANGELOG.md", "letsdo.gemspec"]
+                           "CHANGELOG.md", "docs/**/*.md", "letsdo.gemspec"]
   spec.bindir        = "bin"
   spec.executables   = ["letsdo"]
   spec.require_paths = ["lib"]
