@@ -23,9 +23,9 @@ orchestrator loop semantics, and how to run several agents at once.
   agent (`pi --mode json`). Override the command with `LETSDO_PI_COMMAND`
   (see the [configuration reference](config.md)).
 - The **Backlog.md CLI** (`backlog`) on `PATH` — the task provider reads the
-  open tasks assigned to an agent via
-  `backlog task list --assignee <handle>`. Override with
-  `LETSDO_BACKLOG_COMMAND`.
+  runnable open tasks assigned to an agent via
+  `backlog task list --assignee <handle> --ready --sort priority`. Override
+  with `LETSDO_BACKLOG_COMMAND`.
 
 Tests and the gem build use only Ruby's bundled default gems (Minitest,
 Rake) — no `bundle install` needed.

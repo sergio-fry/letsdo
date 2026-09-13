@@ -24,6 +24,10 @@
 #                            sparse    — one task with only an id and one with
 #                                        only a title (no optional fields);
 #                            weird     — a task list whose entry is not an object;
+#                            order     — mixed status/priority/ordinal/id tasks
+#                                        for the deterministic sort;
+#                            blocked   — one ready, one blocked (unfinished
+#                                        dependency) and one ready task;
 #                            fail      — exit 1 with an error on stderr;
 #                            malformed — stdout is not JSON.
 #   FAKE_BACKLOG_COUNT       number of tasks in the open scenario (default 2).
@@ -32,6 +36,10 @@
 #                            once (for "N tasks → N runs, then wait" loops).
 #   FAKE_BACKLOG_EDIT_FAIL   set to 1 to make `task edit` (TASK-70 write-back)
 #                            exit 1 with an error on stderr.
+#
+# The fake honors --ready like the real CLI: tasks with a non-empty
+# dependencies list are treated as not ready and dropped when the flag is
+# present. Sorting is left to the caller (the provider sorts the batch).
 #
 
 require 'json'
@@ -56,6 +64,17 @@ scenario = ENV.fetch('FAKE_BACKLOG_SCENARIO', 'open')
 count = Integer(ENV.fetch('FAKE_BACKLOG_COUNT', '2'))
 
 titles = %w[Alpha Beta Gamma Delta Epsilon]
+ready_only = ARGV.include?('--ready')
+
+# One task in the full real schema, with the sort inputs varied by the caller.
+def order_task(id, title, status, priority, ordinal)
+  {
+    'id' => id, 'title' => title, 'status' => status, 'priority' => priority,
+    'assignees' => ['@developer'], 'type' => 'task', 'labels' => [],
+    'milestone' => nil, 'parentTaskId' => nil, 'ordinal' => ordinal,
+    'dependencies' => []
+  }
+end
 
 # Tasks were already served once → the loop should now see none and wait.
 if (done_file = ENV['FAKE_BACKLOG_DONE_FILE'])
@@ -87,6 +106,23 @@ tasks = case scenario
           end
         when 'empty'
           []
+        when 'order'
+          [order_task('TASK-A', 'Low', 'To Do', 'low', 10),
+           order_task('TASK-B', 'HighLate', 'To Do', 'high', 30),
+           order_task('TASK-C', 'HighEarly', 'To Do', 'high', 20),
+           order_task('TASK-D', 'HighEarlyTie', 'To Do', 'high', 20),
+           order_task('TASK-E', 'InProgressLow', 'In Progress', 'low', 99),
+           order_task('TASK-F', 'NoPriority', 'To Do', nil, 1)]
+        when 'blocked'
+          [{ 'id' => 'TASK-1', 'title' => 'Ready', 'status' => 'To Do',
+             'priority' => 'high', 'assignees' => ['@developer'], 'ordinal' => 1,
+             'dependencies' => [] },
+           { 'id' => 'TASK-2', 'title' => 'Blocked', 'status' => 'To Do',
+             'priority' => 'high', 'assignees' => ['@developer'], 'ordinal' => 2,
+             'dependencies' => ['TASK-1'] },
+           { 'id' => 'TASK-3', 'title' => 'ReadyLow', 'status' => 'To Do',
+             'priority' => 'low', 'assignees' => ['@developer'], 'ordinal' => 3,
+             'dependencies' => [] }]
         when 'sparse'
           [{ 'id' => 'TASK-1' }, { 'title' => 'No id here' }]
         when 'weird'
@@ -101,6 +137,11 @@ tasks = case scenario
           warn "Unknown FAKE_BACKLOG_SCENARIO: #{scenario}"
           exit 2
         end
+
+# --ready drops unfinished tasks: the fake has no dependency graph, so any
+# non-empty dependencies list counts as blocked (same as the real CLI's
+# "all dependencies completed" filter).
+tasks = tasks.reject { |t| t.is_a?(Hash) && !Array(t['dependencies']).empty? } if ready_only
 
 output = JSON.generate({ 'schemaVersion' => 1, 'kind' => 'task-list', 'tasks' => tasks })
 

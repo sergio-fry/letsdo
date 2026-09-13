@@ -32,17 +32,28 @@ priority-sorted, ready-only batch and keep the fields the selector needs. Do
 prompt (scope B) is a documented follow-up that needs its own decision because
 it changes the agent contract.
 
+**Status: scope A is implemented (TASK-95).** The provider now requests
+`--ready --sort priority` and sorts the normalized batch in the adapter (In
+Progress first, then priority, then ordinal, then id), so the run order it
+hands to the loop is the authoritative one. The analysis below is kept as the
+record; scopes B and C remain out of scope.
+
 ## How selection works today
 
 End-to-end, one `letsdo <name>` session:
 
 1. `Letsdo::Providers::Backlog` runs
-   `backlog task list --assignee <handle> --exclude-status Done --json`
-   (`lib/letsdo/providers/backlog.rb`, `#command_line`). No `--sort` and no
-   `--ready`, so the order is the CLI default (observed: ascending ordinal).
+   `backlog task list --assignee <handle> --exclude-status Done --ready
+   --sort priority --json` (`lib/letsdo/providers/backlog.rb`,
+   `#command_line`). `--ready` drops tasks whose dependencies are not all
+   done; `--sort priority` orders by priority then ordinal as a first pass.
 2. The adapter projects each raw task onto `TASK_FIELDS =
-   %w[id title status priority assignees]` and drops `type`, `ordinal`,
-   `labels`, `milestone`, `parentTaskId` and everything else.
+   %w[id title status priority assignees ordinal type labels milestone]` and
+   drops `reporter`, `parentTaskId`, `createdAt`, `updatedAt` and everything
+   else. It then sorts the batch itself, because the CLI does not put In
+   Progress first: In Progress first, then priority High > Medium > Low, then
+   ordinal ascending, then id ascending. The batch the provider returns is
+   therefore the authoritative run order (TASK-95).
 3. `Letsdo::Loop#run_batch` (`lib/letsdo/loop.rb`) iterates the batch once and
    calls `@run_task.call(task)` for each element. The provider is **not**
    re-polled between the runs of one batch.
@@ -101,10 +112,10 @@ A deterministic selector needs these inputs, in this order:
 
 | Gap | Where | Impact |
 | --- | --- | --- |
-| No sort requested | `Providers::Backlog#command_line` | Batch order is the CLI default, not priority order; diverges from the prompt's `--sort priority` order. |
-| No readiness filter | same | Blocked tasks are offered; only the prompt's blocker rule handles them. |
-| `type`, `ordinal`, `labels`, `milestone` dropped | `TASK_FIELDS` | No capability routing and no deterministic tie-break inside letsdo. |
-| `dependencies` absent from list JSON | backlog `task list --json` | Blocked state is not a field; only the `--ready` filter or a per-task view (`backlog task <id> --json`, N subprocess calls) exposes it. |
+| No sort requested | `Providers::Backlog#command_line` | Resolved in TASK-95: the command requests `--sort priority` and the adapter applies the full In-Progress-first tie-break. |
+| No readiness filter | same | Resolved in TASK-95: the command requests `--ready`, so blocked tasks never reach the loop. |
+| `type`, `ordinal`, `labels`, `milestone` dropped | `TASK_FIELDS` | Resolved in TASK-95: all four are normalized onto `Task`. |
+| `dependencies` absent from list JSON | backlog `task list --json` | Blocked state is not a field; the provider relies on the `--ready` filter instead of N per-task `backlog task <id> --json` calls. |
 | Task object discarded before the run | `AgentLoop#assign_opts` + `Agent#run` | letsdo cannot force the task it selected; the LLM re-selects and can diverge from the batch element (see risks). |
 | No machine-readable agent capabilities | `agents/<name>.md` front matter (only `model` is consumed, `lib/letsdo/agent.rb`) | Type/skill routing exists only as prose in the prompt, not as data. The front-matter block is the natural place to add `types:` / `skills:`. |
 | No claim/lock | backlog only | Two agents (or two processes of the same agent) can race for the same unassigned task; a status update is not atomic. |
@@ -205,7 +216,8 @@ provider: `--ready --sort priority`, the missing normalized fields, and the
 explicit In-Progress→priority→ordinal→id order. It is small, low-risk, uses
 existing backlog CLI features, needs no prompt or agent-contract change, and
 removes the common divergence between the order letsdo reads and the order the
-agent picks.
+agent picks. **Implemented in TASK-95** (`Providers::Backlog#command_line` and
+`#sort`, `Providers::Task` fields).
 
 Record scopes **B and C as out of scope for now**. B (task injection into the
 prompt) is the correct way to fully enforce the batch and fix retry

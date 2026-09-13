@@ -94,7 +94,8 @@ generation, any repeatable task flow you can express as assignee + prompt.
   `PATH` — this is the AI backend that runs the agent (`pi --mode json`).
   The command is configurable via `LETSDO_PI_COMMAND`.
 - The Backlog.md CLI (`backlog`) on `PATH` — the task provider reads open
-  tasks via `backlog task list --assignee <handle>`. Configurable via
+  tasks via `backlog task list --assignee <handle> --ready --sort priority`.
+  Configurable via
   `LETSDO_BACKLOG_COMMAND`.
 
 Tests and the build use only Ruby's bundled default gems (Minitest, Rake) —
@@ -335,10 +336,12 @@ bin/letsdo ──► Letsdo::CLI ──► Letsdo::Agent ──► Letsdo::PiRun
   code (including 128+signal).
 - `Letsdo::OutputStreamer` — routes agent text to stdout and service/tool
   lines to stderr with `HH:MM:SS` prefixes and durations.
-- `Letsdo::BacklogTasks` — the task provider: open tasks for a handle via
-  `backlog task list --assignee <handle> --exclude-status Done --json`;
-  `nil` when the backlog is unreadable (the loop pauses instead of running
-  the agent).
+- `Letsdo::BacklogTasks` — the task provider: runnable open tasks for a
+  handle via `backlog task list --assignee <handle> --exclude-status Done
+  --ready --sort priority --json`, returned in the authoritative run order
+  (In Progress first, then priority High > Medium > Low, then ordinal, then
+  id); `nil` when the backlog is unreadable (the loop pauses instead of
+  running the agent).
 - `Letsdo::Loop` / `Letsdo::AgentLoop` — the orchestrator: tasks → one run
   each → wait → repeat; stopped from outside via `SIGINT/SIGTERM` (the
   running pi child is terminated, exit 0).
@@ -359,7 +362,8 @@ common. This repository itself is run by letsdo: `agents/developer.md` and
   and the per-agent YAML front-matter block, their defaults, precedence and
   where they are read.
 - [Task selection](docs/task-selection.md) — how the next task is chosen,
-  the selection criteria and the deterministic-ordering recommendation.
+  the selection criteria and the deterministic-ordering behavior of the
+  provider batch.
 
 ## Development
 

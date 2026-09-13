@@ -38,9 +38,10 @@ class ProvidersBacklogTest < Minitest::Test
     tasks.each { |task| assert_instance_of(Letsdo::Providers::Task, task) }
   end
 
-  # The real CLI returns extra keys (type, reporter, labels, milestone,
-  # parentTaskId, ordinal, createdAt, updatedAt); the adapter must project
-  # them away instead of splatting them into Task.new (TASK-91).
+  # The real CLI returns extra keys (reporter, parentTaskId, createdAt,
+  # updatedAt); the adapter must project them away instead of splatting
+  # them into Task.new (TASK-91) while keeping the fields selection needs
+  # (TASK-95).
   def test_full_real_schema_is_normalized
     task = call_provider(scenario: 'open', count: 1).first
 
@@ -51,12 +52,21 @@ class ProvidersBacklogTest < Minitest::Test
     assert_equal ['@developer'], task.assignees
   end
 
+  def test_selection_fields_are_normalized
+    task = call_provider(scenario: 'open', count: 1).first
+
+    assert_equal 1001, task.ordinal
+    assert_equal 'task', task.type
+    assert_equal [], task.labels
+    assert_nil task.milestone
+  end
+
   def test_unknown_schema_keys_are_not_exposed
     task = call_provider(scenario: 'open', count: 1).first
 
-    refute task.respond_to?(:type)
     refute task.respond_to?(:reporter)
-    refute task.respond_to?(:labels)
+    refute task.respond_to?(:parentTaskId)
+    refute task.respond_to?(:createdAt)
   end
 
   def test_missing_optional_fields_parse_and_absent_id_falls_back_to_title
@@ -96,9 +106,26 @@ class ProvidersBacklogTest < Minitest::Test
       with_env('FAKE_BACKLOG_ARGV_FILE' => file.path) do
         Letsdo::Providers::Backlog.new(handle: '@developer', command: command, cwd: Dir.pwd).call
       end
-      assert_equal "task|list|--assignee|@developer|--exclude-status|Done|--json\n",
+      assert_equal "task|list|--assignee|@developer|--exclude-status|Done|--ready|--sort|priority|--json\n",
                    File.read(file.path)
     end
+  end
+
+  # --ready turns the fake CLI into the readiness filter: blocked tasks
+  # (unfinished dependencies) are dropped before the adapter sees them, so
+  # the loop is never offered them.
+  def test_blocked_tasks_are_not_offered
+    tasks = call_provider(scenario: 'blocked')
+
+    assert_equal %w[TASK-1 TASK-3], tasks.map(&:id)
+  end
+
+  # Equal priority is the common case; the batch must still be a total order:
+  # In Progress first, then High > Medium > Low, then ordinal, then id.
+  def test_batch_order_is_deterministic_with_equal_priority_tie_break
+    tasks = call_provider(scenario: 'order')
+
+    assert_equal %w[TASK-E TASK-C TASK-D TASK-B TASK-A TASK-F], tasks.map(&:id)
   end
 end
 
@@ -123,6 +150,20 @@ class ProvidersTaskTest < Minitest::Test
     assert_equal [], task.assignees
   end
 
+  def test_labels_coerced_to_array
+    task = Letsdo::Providers::Task.new(id: 'TASK-1', labels: nil)
+    assert_equal [], task.labels
+  end
+
+  def test_selection_fields_default_to_empty
+    task = Letsdo::Providers::Task.new(id: 'TASK-1')
+
+    assert_nil task.ordinal
+    assert_nil task.type
+    assert_nil task.milestone
+    assert_equal [], task.labels
+  end
+
   def test_task_is_frozen
     task = Letsdo::Providers::Task.new(id: 'TASK-1')
     assert task.frozen?
@@ -130,9 +171,9 @@ class ProvidersTaskTest < Minitest::Test
 
   def test_unknown_keyword_is_a_programming_error
     error = assert_raises(ArgumentError) do
-      Letsdo::Providers::Task.new(id: 'TASK-1', type: 'task')
+      Letsdo::Providers::Task.new(id: 'TASK-1', reporter: '@human')
     end
 
-    assert_includes error.message, 'type'
+    assert_includes error.message, 'reporter'
   end
 end
