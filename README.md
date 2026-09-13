@@ -345,6 +345,8 @@ common. This repository itself is run by letsdo: `agents/developer.md` and
   prompt: must-haves, anti-patterns, worked examples.
 - [Configuration reference](docs/config.md) — every environment variable,
   its default, precedence and where it is read.
+- [Task selection](docs/task-selection.md) — how the next task is chosen,
+  the selection criteria and the deterministic-ordering recommendation.
 
 ## Development
 
