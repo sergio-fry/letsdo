@@ -4,6 +4,7 @@ title: 'Spike: algorithmic task selection for agents — feasibility and require
 status: To Do
 assignee: []
 created_date: '2026-09-10 07:27'
+updated_date: '2026-09-13 10:33'
 labels: []
 dependencies: []
 priority: medium
@@ -14,14 +15,28 @@ ordinal: 75000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Исследовать/проанализировать, возможно ли программно и алгоритмически выбирать следующую задачу, которую агенту нужно будет взять.\n\nСейчас агент запускается вручную с указанием конкретной задачи (или без неё). Нужно выяснить:\n- Какие данные нужны для алгоритмического выбора следующей задачи?\n- Какие критерии отбора должны быть (приоритет, тип, зависимости, навыки агента, загрузка)?\n- Чего не хватает в текущей системе для такого выбора?\n- Какие есть риски и ограничения?\n- Набросок возможного подхода/архитектуры.\n\nРезультат: документ с анализом, выводами и рекомендацией — делать или не делать, и если делать, то в каком объёме.
+Investigate whether the next task an agent should pick up can be selected programmatically and algorithmically.
+
+Today an agent is launched manually with a specific task, or without one. We need to determine:
+- What data is required for algorithmic selection of the next task?
+- Which selection criteria should apply (priority, type, dependencies, agent skills, load)?
+- What is missing in the current system to support such selection?
+- What are the risks and limitations?
+- A sketch of a possible approach or architecture.
+
+Outcome: a document with the analysis, conclusions, and a recommendation - whether to build it and, if so, to what scope.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Описаны возможные критерии отбора задач (приоритет, тип, зависимости, навыки, загрузка)
-- [ ] #2 Описано, каких данных не хватает в текущей системе для автоматического выбора
-- [ ] #3 Выявлены риски, ограничения и граничные случаи (например, две одинаково приоритетные задачи)
-- [ ] #4 Предложен набросок подхода или архитектуры
-- [ ] #5 Дан чёткий вывод: делать/не делать, и в каком объёме
+- [ ] #1 Selection criteria for tasks are described (priority, type, dependencies, skills, load)
+- [ ] #2 The data missing in the current system for automatic selection is described
+- [ ] #3 Risks, limitations, and edge cases are identified (e.g., two tasks with equal priority)
+- [ ] #4 A sketch of a possible approach or architecture is proposed
+- [ ] #5 A clear conclusion is given: build it or not, and to what scope
 <!-- AC:END -->
+
+## Definition of Done
+<!-- DOD:BEGIN -->
+- [ ] #1 Analysis document committed to docs/
+<!-- DOD:END -->

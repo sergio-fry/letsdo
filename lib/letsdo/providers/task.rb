@@ -6,6 +6,11 @@ module Letsdo
     #
     # Adapters map tracker-specific JSON onto this shape. Business logic
     # consumes only this interface, not the raw tracker schema.
+    #
+    # The constructor is strict on purpose: adapters project the tracker
+    # payload onto these keywords instead of forwarding it, so extra tracker
+    # fields never reach here and a wrong key is caught as a programming
+    # error instead of silently ignored.
     class Task
       attr_reader :id, :title, :status, :priority, :assignees
 

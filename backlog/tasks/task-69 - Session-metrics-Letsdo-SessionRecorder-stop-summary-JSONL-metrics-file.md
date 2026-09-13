@@ -1,11 +1,11 @@
 ---
 id: TASK-69
 title: 'Session metrics: Letsdo::SessionRecorder, stop summary, JSONL metrics file'
-status: To Do
+status: In Progress
 assignee:
   - '@developer'
 created_date: '2026-09-04 08:10'
-updated_date: '2026-09-04 10:27'
+updated_date: '2026-09-10 22:19'
 labels: []
 dependencies:
   - TASK-42
@@ -29,3 +29,15 @@ Implement the session-metrics design from TASK-63 (design comments C1-C3; read t
 - [ ] #5 Tests: new session_recorder_test.rb (fake clocks — durations, done/failed/interrupted classification, left + nil, waiting derivation, summary format + cap, JSONL via StringIO), fanout unit test, agent_loop_test (exit code forwarded), cli_test updated (summary line present in plain output; LETSDO_METRICS_FILE via tempfile), tui_metrics_test semantics unchanged; no real TTY anywhere; rake test 0 failures; rubocop 0 offenses
 - [ ] #6 All texts English (TASK-35); plain non-TTY output byte-identical to today except the added summary line(s) after 'letsdo: stopped'; README documents LETSDO_METRICS_FILE and the stop summary
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Modify lib/letsdo/tui/metrics.rb: add optional exit_code param to run_finished 2. Modify lib/letsdo/agent_loop.rb: pass exit_code to @metrics&.run_finished(code) in run_one_task ensure 3. Create lib/letsdo/metrics/fanout.rb: Fanout class forwarding provider_result/run_started/run_finished to observers 4. Create lib/letsdo/session_recorder.rb: SessionRecorder class with injectable monotonic+wall clocks, thread-safe, JSONL event writing, summary aggregation, summary_line formatting 5. Modify lib/letsdo/cli.rb: wire recorder in plain/TUI modes, handle LETSDO_METRICS_FILE env var, print summary_line after loop/session 6. Update test/agent_loop_test.rb: change stub run_finished to accept optional param 7. Create test/session_recorder_test.rb and test/fanout_test.rb 8. Update cli_test.rb for summary line and metrics file 9. Update README with LETSDO_METRICS_FILE docs and stop summary format
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Created SessionRecorder class (mode-independent, thread-safe, JSONL output, summary aggregation); wired into CLI Builder for plain mode (metrics: recorder) and TUI mode (Fanout wrapping recorder + Tui::Metrics); added LETSDO_METRICS_FILE handling; modified run_finished signature in Tui::Metrics and AgentLoop ensure block; updated lib/letsdo.rb requires.
+<!-- SECTION:NOTES:END -->

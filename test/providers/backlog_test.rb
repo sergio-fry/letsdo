@@ -38,6 +38,35 @@ class ProvidersBacklogTest < Minitest::Test
     tasks.each { |task| assert_instance_of(Letsdo::Providers::Task, task) }
   end
 
+  # The real CLI returns extra keys (type, reporter, labels, milestone,
+  # parentTaskId, ordinal, createdAt, updatedAt); the adapter must project
+  # them away instead of splatting them into Task.new (TASK-91).
+  def test_full_real_schema_is_normalized_and_extra_keys_ignored
+    tasks = call_provider(scenario: 'open', count: 1)
+    task = tasks.first
+
+    assert_equal 'TASK-1', task.id
+    assert_equal 'Alpha', task.title
+    assert_equal 'To Do', task.status
+    assert_nil task.priority
+    assert_equal ['@developer'], task.assignees
+    refute task.respond_to?(:type)
+    refute task.respond_to?(:reporter)
+    refute task.respond_to?(:labels)
+  end
+
+  def test_missing_optional_fields_parse_and_absent_id_falls_back_to_title
+    tasks = call_provider(scenario: 'sparse')
+
+    assert_equal ['TASK-1', nil], tasks.map(&:id)
+    assert_equal 'TASK-1', tasks.first.to_s
+    assert_equal 'No id here', tasks.last.to_s
+  end
+
+  def test_non_object_task_entry_returns_nil
+    assert_nil call_provider(scenario: 'weird')
+  end
+
   def test_no_tasks_returns_empty_array
     assert_equal [], call_provider(scenario: 'empty')
   end
@@ -93,5 +122,13 @@ class ProvidersTaskTest < Minitest::Test
   def test_task_is_frozen
     task = Letsdo::Providers::Task.new(id: 'TASK-1')
     assert task.frozen?
+  end
+
+  def test_unknown_keyword_is_a_programming_error
+    error = assert_raises(ArgumentError) do
+      Letsdo::Providers::Task.new(id: 'TASK-1', type: 'task')
+    end
+
+    assert_includes error.message, 'type'
   end
 end

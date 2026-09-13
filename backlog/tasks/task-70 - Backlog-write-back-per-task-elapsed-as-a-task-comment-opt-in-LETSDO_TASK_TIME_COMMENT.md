@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@developer'
 created_date: '2026-09-04 08:10'
-updated_date: '2026-09-04 10:27'
+updated_date: '2026-09-13 10:37'
 labels: []
 dependencies:
   - TASK-69
@@ -24,10 +24,16 @@ Implement TASK-63 design C3 point 3: at session stop, persist per-task elapsed i
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Default off: with LETSDO_TASK_TIME_COMMENT unset or != 1, no task file is ever modified, no extra backlog subprocess runs, and behavior is identical to TASK-69 alone
-- [ ] #2 With LETSDO_TASK_TIME_COMMENT=1, at session stop the CLI appends a comment to each exit-0 run's task: backlog task edit <id> --comment 'letsdo: completed in 4m 12s' --comment-author @letsdo (command and cwd from CLI config; duration formatting mm:ss / Xm Ys shared with the TASK-69 summary); a fresh final provider query once at stop excludes still-open tasks from write-back
-- [ ] #3 Failure tolerance: a missing/renamed task or a failing backlog command warns once per task on stderr, does not abort the stop path, and the summary line reports 'N comments not written'; the process exit code stays 0
-- [ ] #4 The recorder stays provider-agnostic (no backlog knowledge); the write-back is CLI-level and consumes recorder runs only
-- [ ] #5 Tests: CLI-level with a fake backlog command in a tempdir project — flag off (no comment), flag on (comment appended with author @letsdo, still-open tasks skipped), failure tolerance, duration formatting; rake test 0 failures; rubocop 0 offenses; README documents the flag
-- [ ] #6 All texts English (TASK-35)
+- [ ] #1 With LETSDO_TASK_TIME_COMMENT unset or not equal to 1, no task file is modified, no backlog subprocess runs, and behavior is identical to TASK-69 alone
+- [ ] #2 With LETSDO_TASK_TIME_COMMENT=1, at session stop each exit-0 run whose task is no longer open gets a comment recording the elapsed duration, authored as @letsdo; still-open tasks are skipped
+- [ ] #3 A missing/renamed task or a failing backlog command warns once per task on stderr, does not abort the stop path, the summary reports 'N comments not written', and the process exit code stays 0
+- [ ] #4 Tests verify flag-off (no comment), flag-on (comment appended, still-open skipped), failure tolerance, and duration formatting
 <!-- AC:END -->
+
+## Definition of Done
+<!-- DOD:BEGIN -->
+- [ ] #1 rake test 0 failures
+- [ ] #2 rubocop 0 offenses
+- [ ] #3 README documents LETSDO_TASK_TIME_COMMENT
+- [ ] #4 All texts English (TASK-35)
+<!-- DOD:END -->

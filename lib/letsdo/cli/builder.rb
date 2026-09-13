@@ -6,27 +6,30 @@ module Letsdo
     # module so Builder stays within the class-length limit; mirrors the
     # CLILaunch/CLIInit split pattern.
     module BuilderTui
-      def run_tui(name)
-        ctx = tui_context(name)
+      def run_tui(name, recorder)
+        ctx = tui_context(name, recorder)
         session = Tui::Session.new(**ctx[:session])
         session.run { ctx[:loop].run }
+      ensure
+        recorder.session_stop
+        @stderr.puts(recorder.summary_line)
       end
 
-      def tui_context(name)
-        parts = tui_parts(name)
+      def tui_context(name, recorder)
+        parts = tui_parts(name, recorder)
         {
           loop: tui_loop(name, parts),
           session: tui_session_args(name, **parts)
         }
       end
 
-      def tui_parts(name)
+      def tui_parts(name, recorder)
         clock = -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }
         handle = assignee_handle(name)
         log = Tui::LogBuffer.new
         {
           clock: clock, handle: handle, log: log,
-          metrics: tui_metrics(name, handle, clock, log),
+          metrics: Letsdo::Metrics::Fanout.new(recorder, tui_metrics(name, handle, clock, log)),
           agent: agent_for(name, OutputStreamer.new(log: log)),
           provider: provider_for(handle),
           pause_gate: Control::PauseGate.new
@@ -49,7 +52,7 @@ module Letsdo
           name: name, handle: parts[:handle], log: parts[:log], metrics: parts[:metrics],
           terminal: Tui::Terminal.new(stream: @stdout),
           input: Tui::Input.new(stdin: @stdin),
-          refresh: -> { parts[:provider].call },
+          refresh: -> { tasks = parts[:provider].call; tasks ? tasks.length : nil },
           wait_seconds: wait_seconds, clock: parts[:clock],
           pause_gate: parts[:pause_gate], runner: -> { parts[:agent].backend }
         }
@@ -104,6 +107,18 @@ module Letsdo
         @backend_registry = rest[:backend_registry] || BACKENDS
       end
 
+      # Returns the IO for the LETSDO_METRICS_FILE, or nil if unset or
+      # unwritable. Emits a warning to stderr on invalid path.
+      def metrics_io
+        path = @env['LETSDO_METRICS_FILE']
+        return nil if path.nil? || path.empty?
+
+        File.open(path, 'a', encoding: 'UTF-8')
+      rescue SystemCallError, IOError => e
+        @stderr.puts("letsdo: cannot open metrics file #{path}: #{e.message}")
+        nil
+      end
+
       # Runs <name> in plain or TUI mode; returns the process exit code.
       def run(name)
         return 1 unless resolve_provider!
@@ -111,14 +126,22 @@ module Letsdo
 
         store = PromptStore.new(root: @root)
         announce_default_prompt(name, store) if store.read(name).nil?
-        tui? ? run_tui(name) : run_plain(name)
+        recorder = Letsdo::SessionRecorder.new(
+          name: name,
+          handle: assignee_handle(name),
+          metrics_io: metrics_io
+        )
+        tui? ? run_tui(name, recorder) : run_plain(name, recorder)
       end
 
       private
 
-      def run_plain(name)
+      def run_plain(name, recorder)
         streamer = OutputStreamer.new(stdout: @stdout, stderr: @stderr)
-        agent_loop(name, streamer, stderr: @stderr).run
+        agent_loop(name, streamer, stderr: @stderr, metrics: recorder).run
+      ensure
+        recorder.session_stop
+        @stderr.puts(recorder.summary_line)
       end
 
       def agent_for(name, streamer)

@@ -4,6 +4,8 @@
 /Gemfile.lock
 *.gem
 /coverage/
+# Pi agent runtime state (goals/ledger/locks — never commit)
+/.pi/
 # Debug captures (never commit — redirect to /tmp instead)
 .test_report.txt
 c_tui*.txt

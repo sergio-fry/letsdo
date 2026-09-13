@@ -60,8 +60,13 @@ module Letsdo
       end
 
       # An agent run finished: increments the done counter and clears the
-      # current-task state.
-      def run_finished
+      # current-task state. The exit code is accepted for compatibility
+      # with the session recorder (TASK-69) but is ignored here — the
+      # header does not classify outcomes.
+      #
+      # @param _exit_code [Integer, nil] the run exit code (ignored)
+      # @return [void]
+      def run_finished(_exit_code = nil)
         @mutex.synchronize do
           @done += 1
           @current_task = nil

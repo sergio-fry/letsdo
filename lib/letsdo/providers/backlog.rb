@@ -18,6 +18,12 @@ module Letsdo
     # The command runs in the project root (cwd), where the backlog CLI finds
     # the backlog/ folder — the same context as a single agent run.
     class Backlog
+      # Keys of the normalized Letsdo::Providers::Task shape. The backlog CLI
+      # emits more (type, reporter, labels, milestone, parentTaskId, ordinal,
+      # createdAt, updatedAt); the adapter projects onto these and ignores the
+      # rest so a growing CLI schema cannot crash the loop.
+      TASK_FIELDS = %w[id title status priority assignees].freeze
+
       # @param handle [String] assignee handle to filter by (e.g. "@developer")
       # @param command [String] backlog CLI command (overridable for tests)
       # @param cwd [String, nil] project root for the CLI; nil = inherit cwd
@@ -41,12 +47,22 @@ module Letsdo
         return nil unless status.success?
 
         tasks = JSON.parse(out)['tasks']
-        tasks.is_a?(Array) ? tasks.map { |t| Task.new(**t.transform_keys(&:to_sym)) } : nil
+        tasks.is_a?(Array) ? tasks.map { |raw| normalize(raw) } : nil
       rescue Errno::ENOENT, JSON::ParserError, TypeError
         nil
       end
 
       private
+
+      # Projects one raw CLI task onto the normalized shape. Unknown keys are
+      # ignored (the CLI schema grows over time); a non-Hash entry means the
+      # payload is not the expected schema and raises TypeError, which #call
+      # turns into nil.
+      def normalize(raw)
+        raise TypeError, "task is not an object: #{raw.class}" unless raw.is_a?(Hash)
+
+        Task.new(**TASK_FIELDS.to_h { |field| [field.to_sym, raw[field]] })
+      end
 
       # [command..., task, list, --assignee <handle>, --exclude-status Done, --json]
       def command_line

@@ -75,7 +75,7 @@ module Letsdo
       @stderr.puts("letsdo: #{@name} exited with code #{code}") if code != 0
       @last_attempted[task_key(task)] = code
     ensure
-      @metrics&.run_finished
+      @metrics&.run_finished(code)
     end
 
     def task_label(task)

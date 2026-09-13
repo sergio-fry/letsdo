@@ -144,7 +144,7 @@ class AgentLoopMetricsRecorder
     @events << [:start, task]
   end
 
-  def run_finished
+  def run_finished(_exit_code = nil)
     @events << [:finish]
   end
 end

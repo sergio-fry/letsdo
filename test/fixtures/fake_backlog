@@ -18,8 +18,12 @@
 #   FAKE_BACKLOG_ARGV_FILE   path: if set, ARGV.join("|") is written there —
 #                            to check the arguments (assignee, exclude, json).
 #   FAKE_BACKLOG_SCENARIO    output:
-#                            open      — <count> open tasks (default 2);
+#                            open      — <count> open tasks (default 2) in the
+#                                        full real task schema;
 #                            empty     — no tasks;
+#                            sparse    — one task with only an id and one with
+#                                        only a title (no optional fields);
+#                            weird     — a task list whose entry is not an object;
 #                            fail      — exit 1 with an error on stderr;
 #                            malformed — stdout is not JSON.
 #   FAKE_BACKLOG_COUNT       number of tasks in the open scenario (default 2).
@@ -55,12 +59,24 @@ tasks = case scenario
               'id' => "TASK-#{i}",
               'title' => titles[(i - 1) % titles.length],
               'status' => 'To Do',
+              'type' => 'task',
               'priority' => nil,
-              'assignees' => ['@developer']
+              'assignees' => ['@developer'],
+              'reporter' => nil,
+              'labels' => [],
+              'milestone' => nil,
+              'parentTaskId' => nil,
+              'ordinal' => 1000 + i,
+              'createdAt' => '2026-09-03T15:27:00Z',
+              'updatedAt' => '2026-09-03T16:34:00Z'
             }
           end
         when 'empty'
           []
+        when 'sparse'
+          [{ 'id' => 'TASK-1' }, { 'title' => 'No id here' }]
+        when 'weird'
+          ['not-a-task']
         when 'fail'
           warn 'backlog: boom'
           exit 1
