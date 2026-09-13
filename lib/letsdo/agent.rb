@@ -2,7 +2,8 @@
 
 module Letsdo
   # A single agent run: reads the prompt from agents/<name>.md by agent name
-  # (falling back to the built-in default prompt when the file is missing)
+  # (falling back to the built-in default prompt when the file is missing),
+  # prepends the agent's identity (name + backlog assignee handle, TASK-85)
   # and delegates to the injected backend_factory. Returns the backend exit
   # code. There are no unknown agents -- every name runs, with the file
   # prompt when present and with Letsdo::DefaultPrompt::TEXT otherwise.
@@ -21,11 +22,16 @@ module Letsdo
     #        vocabulary.
     # @param streamer [OutputStreamer] where to print output (by default
     #        the real stdout/stderr)
-    def initialize(name:, root:, backend_factory:, streamer: nil)
+    # @param handle [String, nil] the agent's backlog assignee handle
+    #        (Config#assignee_handle). Defaults to @<name>; the launcher
+    #        passes the resolved handle so the injected identity always
+    #        matches the handle the backlog tasks are assigned to.
+    def initialize(name:, root:, backend_factory:, streamer: nil, handle: nil)
       @name = name
       @root = root
       @backend_factory = backend_factory
       @streamer = streamer || OutputStreamer.new
+      @handle = handle || "@#{name}"
     end
 
     # The backend of the last/current run -- lets the orchestrator
@@ -37,6 +43,7 @@ module Letsdo
     # @return [Integer] backend exit code
     def run
       prompt = prompt_store.read(@name) || Letsdo::DefaultPrompt::TEXT
+      prompt = Letsdo::AgentIdentity.inject(prompt, name: @name, handle: @handle)
       model  = prompt_store.config(@name)[:model]
       @backend = @backend_factory.call(prompt: prompt, streamer: @streamer,
                                        model: model)

@@ -26,7 +26,7 @@ LETSDO_ROOT  (default: the current working directory)
 | `LETSDO_PI_FLAGS` | unset (no flags) | Extra pi flags, split on whitespace, e.g. `--model anthropic/claude-sonnet-4-5`. |
 | `AGENT_PI_FLAGS` | unset | Fallback for `LETSDO_PI_FLAGS` when it is blank (compatibility with the old `bin/agent`). |
 | `LETSDO_PI_COMMAND` | `pi` | The pi command used to run agents; overridable for tests / fake pi. |
-| `AGENT_ASSIGNEE_HANDLE` | `@<name>` | The agent's backlog assignee handle (used verbatim when set). |
+| `AGENT_ASSIGNEE_HANDLE` | `@<name>` | The agent's backlog assignee handle (used verbatim when set). Also injected as the agent's identity in its prompt. |
 | `LETSDO_WAIT_SECONDS` | `10` | Retry interval (seconds) when there are no open tasks. |
 | `AGENT_WAIT_SECONDS` | `10` (via fallback) | Fallback for `LETSDO_WAIT_SECONDS` when it is blank (`bin/agent-loop` compatibility). |
 | `LETSDO_MAX_RETRIES` | `3` | Max consecutive failed runs of the same task before giving up for the session. |
@@ -50,7 +50,9 @@ LETSDO_ROOT  (default: the current working directory)
 - `LETSDO_MAX_RETRIES`: an invalid (non-integer) value falls back to `3`.
 - `LETSDO_RETRY_CAP`: an invalid (non-numeric) value falls back to `300`.
 - `AGENT_ASSIGNEE_HANDLE`: used as-is when set and non-blank; otherwise the
-  one rule: handle = `@<name>`.
+  one rule: handle = `@<name>`. The resolved value is both the assignee the
+  loop queries the backlog for and the handle letsdo injects into the
+  agent's prompt identity.
 
 ### Examples
 

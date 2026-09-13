@@ -57,7 +57,9 @@ generation, any repeatable task flow you can express as assignee + prompt.
   one task), then the loop waits for new ones until stopped with
   `SIGINT/SIGTERM` (clean exit, code 0).
 - **Agents as prompt files** — `agents/<name>.md` is the whole identity of
-  an agent: role, rules, workflow. Add a file, get an agent.
+  an agent: role, rules, workflow. Add a file, get an agent. letsdo injects
+  the agent's name and backlog assignee handle into the prompt on every
+  launch, so the template only needs role and rules.
 - **Built-in default prompt** — an agent starts even without a prompt file:
   it runs on the built-in default prompt (process-only instructions), and
   letsdo announces once where the prompt was looked for and how to create
@@ -180,7 +182,7 @@ All knobs are environment variables:
 | `LETSDO_PI_FLAGS` | — | Extra pi flags, e.g. `--model anthropic/claude-sonnet-4-5` (split on whitespace). |
 | `AGENT_PI_FLAGS` | — | Fallback for `LETSDO_PI_FLAGS` (compatibility with the old `bin/agent`). |
 | `LETSDO_PI_COMMAND` | `pi` | The pi command used to run agents; overridable for tests / fake pi. |
-| `AGENT_ASSIGNEE_HANDLE` | `@<name>` | The agent's backlog assignee handle. The one rule: handle = name. |
+| `AGENT_ASSIGNEE_HANDLE` | `@<name>` | The agent's backlog assignee handle. The one rule: handle = name. Also the handle injected into the agent's prompt identity. |
 | `LETSDO_WAIT_SECONDS` | 10 | Retry interval when there are no open tasks. |
 | `AGENT_WAIT_SECONDS` | — | Fallback for `LETSDO_WAIT_SECONDS` (`bin/agent-loop` compatibility). |
 | `LETSDO_MAX_RETRIES` | 3 | Max consecutive failed runs of the same task before giving up for the session. |

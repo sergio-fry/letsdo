@@ -57,6 +57,24 @@ class CliTest < Minitest::Test
       with_env(env_key => file.path) { yield file.path }
     end
   end
+
+  # The fake pi appends one ARGV record per run; every record starts with
+  # --mode|json|. Splitting on that prefix yields the per-run prompt, which
+  # is multi-line once the identity block is injected (TASK-85).
+  def argv_records(path)
+    File.read(path).split('--mode|json|').drop(1)
+  end
+
+  # Records of runs on the built-in default prompt: each must carry the
+  # injected identity of the launched agent (TASK-85).
+  def assert_injected_default_prompt(records, name:)
+    assert_equal 2, records.length
+    records.each do |record|
+      assert_includes record, Letsdo::DefaultPrompt::TEXT
+      assert_includes record, "You are the agent `#{name}`"
+      assert_includes record, "assignee handle is `@#{name}`"
+    end
+  end
 end
 
 # Usage, version, help, unknown agent/option.
@@ -144,7 +162,7 @@ class CliRunTest < CliTest
     with_argv_file('FAKE_PI_ARGV_FILE') do |path|
       code = run_developer(count: 3)
       assert_equal 0, code
-      assert_equal 3, File.read(path).lines.length
+      assert_equal 3, argv_records(path).length
       assert_equal "Hello, world!\n" * 3, @out.string
     end
   end
@@ -203,10 +221,7 @@ class CliRunTest < CliTest
       code = run_cli(['nosuch'], prompts: {}, env: env, sleeper: stop_on_first_wait)
 
       assert_equal 0, code
-      # The prompt text is multi-line, so the argv record spans newlines and
-      # puts appends no separator after it: assert the exact two records.
-      record = "--mode|json|#{Letsdo::DefaultPrompt::TEXT}"
-      assert_equal record * 2, File.read(path)
+      assert_injected_default_prompt(argv_records(path), name: 'nosuch')
     end
   end
 
@@ -263,6 +278,28 @@ class CliRunTest < CliTest
 
     assert_equal 0, code
     assert_includes @err.string, 'retrying in 3.5s'
+  end
+end
+
+# Identity injection into the launched prompt (TASK-85): the handle used for
+# backlog assignment is the handle the agent reads about itself.
+class CliIdentityTest < CliTest
+  def test_default_handle_is_the_agent_name
+    with_argv_file('FAKE_PI_ARGV_FILE') do |path|
+      run_developer(count: 1)
+      assert_includes File.read(path), 'assignee handle is `@developer`'
+    end
+  end
+
+  # The AGENT_ASSIGNEE_HANDLE override reaches both the provider argv and
+  # the injected prompt, so identity and assignment cannot drift apart.
+  def test_assignee_handle_override_reaches_the_injected_identity
+    with_argv_file('FAKE_PI_ARGV_FILE') do |path|
+      run_developer(count: 1, extra: { 'AGENT_ASSIGNEE_HANDLE' => '@someone' })
+      prompt = File.read(path)
+      assert_includes prompt, 'assignee handle is `@someone`'
+      refute_includes prompt, 'assignee handle is `@developer`'
+    end
   end
 end
 

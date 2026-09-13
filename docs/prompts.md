@@ -19,6 +19,10 @@ worked examples from this repository's own agents.
 
 - The prompt is read on every run from `<LETSDO_ROOT>/agents/<name>.md` and
   handed to pi as the agent's system prompt (`pi --mode json`).
+- Before the prompt is handed over, letsdo prepends the agent's identity —
+  its name and backlog assignee handle (`Config#assignee_handle`, default
+  `@<name>`) — to it. The injection always happens, whatever the template
+  contains, so a template never has to state the name or handle.
 - When the file is missing, the agent runs on the built-in default prompt
   (process-only instructions); letsdo announces where it looked and how to
   create a prompt (`letsdo <name> --init`).
@@ -29,9 +33,12 @@ worked examples from this repository's own agents.
 
 A robust agent prompt has these parts:
 
-1. **Identity.** Start with who the agent is: `You are a developer agent
-   named developer.` The name in the prompt and the file name should match —
-   it anchors every message the agent writes into tracked artifacts.
+1. **Identity.** The agent's identity — its name and backlog assignee
+   handle — is injected by letsdo at the top of every prompt, so the
+   template does not have to state it. A hardcoded handle is a bad idea:
+   it drifts from `AGENT_ASSIGNEE_HANDLE` and the backlog assignment. You
+   can still describe the role in prose; keep the name in the prompt
+   matching the file name.
 
 2. **Exactly one task per run.** The main rule. The agent picks up and
    completes exactly one assigned task, then stops. This is what keeps an
@@ -102,8 +109,9 @@ A robust agent prompt has these parts:
 - **Untestable acceptance criteria.** "Works well" cannot be verified.
   Prefer testable, objective criteria ("`rake test` green, 0 failures",
   "the created task is assigned to @developer").
-- **Missing identity/role.** Without identity the agent's messages and
-  commit authorship drift; keep the name in the prompt.
+- **Missing identity/role.** Without a role the agent cannot tell what it
+  owns. letsdo injects the name and handle, but the role and rules are the
+  template's job.
 - **Mixing languages in tracked artifacts.** In this project the convention
   is English for tasks, notes, decisions and docs (TASK-35/48) even though
   conversations may be in any language. State the convention; do not rely
@@ -151,7 +159,8 @@ with concrete commands → deliverables → style rule → prohibitions.**
 
 Before writing `agents/<name>.md`, check:
 
-- [ ] Identity line: "You are a <role> agent named <name>."
+- [ ] Role described in prose (the name/handle identity block is injected
+      by letsdo).
 - [ ] Main rule: exactly one task per run.
 - [ ] No-tasks rule: do not invent work, do not create tasks.
 - [ ] Task selection: in progress → priority → ordinal; blocked → take the

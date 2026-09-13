@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Agent prompts now carry the agent's own identity: on every
+  `letsdo <name>` launch, letsdo prepends an identity block (agent name +
+  backlog assignee handle) to the system prompt, whether the prompt comes
+  from `agents/<name>.md` or the built-in default. The handle is
+  `Config#assignee_handle` (default `@<name>`, overridable with
+  `AGENT_ASSIGNEE_HANDLE`), so the identity an agent reads matches the
+  handle its backlog tasks are assigned to (TASK-85).
+
 ## [0.4.0] - 2026-09-08
 
 ### Changed

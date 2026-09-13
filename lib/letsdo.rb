@@ -6,6 +6,7 @@
 #   Letsdo::Errors           - error hierarchy (Letsdo::Error and others)
 #   Letsdo::PromptStore      - access to agents/*.md prompts
 #   Letsdo::DefaultPrompt    - the built-in default prompt (fallback run, --init template)
+#   Letsdo::AgentIdentity    - the identity block injected into every agent prompt
 #   Letsdo::OutputStreamer   - where and how agent text and service lines are printed
 #   Letsdo::Backends::Pi     - running pi --mode json and parsing the event stream
 #   Letsdo::Agent            - a single agent run: prompt from agents/ or default + pi
@@ -26,6 +27,7 @@ require_relative 'letsdo/errors'
 require_relative 'letsdo/config'
 require_relative 'letsdo/prompt_store'
 require_relative 'letsdo/default_prompt'
+require_relative 'letsdo/agent_identity'
 require_relative 'letsdo/output_streamer'
 require_relative 'letsdo/backends/backend'
 require_relative 'letsdo/backends/pi'

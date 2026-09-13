@@ -67,10 +67,12 @@ class AgentTest < Minitest::Test
     with_project('developer' => 'You are a developer.') do |root|
       argv = captured_argv(make_agent(name: 'nosuch', root: root))
 
-      assert_equal Letsdo::DefaultPrompt::TEXT, argv.split('|').last
+      assert_includes argv.split('|').last, Letsdo::DefaultPrompt::TEXT
     end
   end
 
+  # Identity injection (TASK-85) is covered in agent_identity_test.rb; the
+  # default-prompt fallback here only needs to prove the text still arrives.
   def test_run_unknown_agent_streams_output_like_a_known_one
     with_project('developer' => 'You are a developer.') do |root|
       make_agent(name: 'nosuch', root: root).run

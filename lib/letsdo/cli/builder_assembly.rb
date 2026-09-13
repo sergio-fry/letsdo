@@ -67,7 +67,7 @@ module Letsdo
       private
 
       def agent_for(name, streamer)
-        Agent.new(name: name, root: @root,
+        Agent.new(name: name, root: @root, handle: assignee_handle(name),
                   backend_factory: @selected_backend_factory,
                   streamer: streamer)
       end
