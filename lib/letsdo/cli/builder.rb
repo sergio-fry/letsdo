@@ -14,8 +14,7 @@ module Letsdo
         session = Tui::Session.new(**ctx[:session])
         session.run { ctx[:loop].run }
       ensure
-        recorder.session_stop
-        @stderr.puts(recorder.summary_line)
+        finish_session(name, recorder)
       end
 
       def tui_context(name, recorder)

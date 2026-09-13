@@ -30,12 +30,26 @@
 #   FAKE_BACKLOG_DONE_FILE   path: if the file exists, the open scenario
 #                            turns into empty — tasks were already served
 #                            once (for "N tasks → N runs, then wait" loops).
+#   FAKE_BACKLOG_EDIT_FAIL   set to 1 to make `task edit` (TASK-70 write-back)
+#                            exit 1 with an error on stderr.
 #
 
 require 'json'
 
 if (argv_file = ENV['FAKE_BACKLOG_ARGV_FILE'])
   File.open(argv_file, 'a') { |file| file.puts(ARGV.join('|')) }
+end
+
+# Write-back (TASK-70): `task edit <id> --comment ... --comment-author ...`.
+# Recorded above like list calls; FAKE_BACKLOG_EDIT_FAIL=1 makes it fail
+# (simulates a missing/renamed task or a broken CLI).
+if ARGV[0] == 'task' && ARGV[1] == 'edit'
+  if ENV['FAKE_BACKLOG_EDIT_FAIL'] == '1'
+    warn 'backlog: edit failed'
+    exit 1
+  end
+
+  exit 0
 end
 
 scenario = ENV.fetch('FAKE_BACKLOG_SCENARIO', 'open')

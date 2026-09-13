@@ -84,6 +84,13 @@ module Letsdo
       @env['LETSDO_DEBUG'] == '1'
     end
 
+    # Whether per-task elapsed is written back into the task record as a
+    # backlog comment at session stop (TASK-70). Opt-in: only the literal
+    # '1' enables it, so no task file is ever modified by default.
+    def task_time_comment?
+      @env['LETSDO_TASK_TIME_COMMENT'] == '1'
+    end
+
     # Give-up after N consecutive failed runs of the same task in a session
     # (default 3). Any invalid value falls back to the default.
     def max_retries

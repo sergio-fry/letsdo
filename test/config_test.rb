@@ -163,3 +163,24 @@ class ConfigRetryEnvTest < Minitest::Test
     assert_equal 300.0, config('LETSDO_RETRY_CAP' => 'not-a-number').retry_cap
   end
 end
+
+# LETSDO_TASK_TIME_COMMENT (TASK-70): opt-in per-task elapsed write-back —
+# only the literal '1' enables it.
+class ConfigTaskTimeCommentTest < Minitest::Test
+  def config(env)
+    Letsdo::Config.new(env: env)
+  end
+
+  def test_disabled_by_default
+    refute config({}).task_time_comment?
+  end
+
+  def test_enabled_by_one
+    assert config('LETSDO_TASK_TIME_COMMENT' => '1').task_time_comment?
+  end
+
+  def test_disabled_for_other_values
+    refute config('LETSDO_TASK_TIME_COMMENT' => 'true').task_time_comment?
+    refute config('LETSDO_TASK_TIME_COMMENT' => '0').task_time_comment?
+  end
+end

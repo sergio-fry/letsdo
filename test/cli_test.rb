@@ -397,6 +397,21 @@ class CliTuiTest < CliTest
     assert_includes tty_out.string, "\e[?1049h"
     assert_includes tty_out.string, "\e[?1049l"
   end
+
+  # Write-back in TUI mode (TASK-70): the shared stop path runs after the
+  # terminal is restored, so a TUI session also comments the elapsed time.
+  def test_tui_write_back_comments_a_completed_task
+    with_argv_file('FAKE_BACKLOG_ARGV_FILE') do |path|
+      # No key is pressed: the injected sleeper stops the loop after TASK-1
+      # completes, so the write-back runs deterministically.
+      code, = run_tui('', { count: 1, 'LETSDO_TASK_TIME_COMMENT' => '1' },
+                      sleeper: stop_on_first_wait)
+
+      assert_equal 0, code
+      assert_includes File.read(path), 'task|edit|TASK-1|--comment|letsdo: completed in '
+      assert_includes @err.string, 'letsdo: session:'
+    end
+  end
 end
 
 # --init scaffold command (TASK-44): creates agents/<name>.md with the
@@ -487,6 +502,47 @@ class CliInitTest < CliTest
       assert_equal 0, code
       assert_equal 'You are a developer.', File.read(prompt_file(root, 'developer'))
       refute_includes @out.string, 'created '
+    end
+  end
+end
+
+# Per-task elapsed write-back (TASK-70): opt-in LETSDO_TASK_TIME_COMMENT.
+# Verifies the flag gates the whole feature (no subprocess, no mutation) and
+# that a failing edit is non-fatal and reported in the stop summary.
+class CliTaskTimeCommentTest < CliTest
+  def test_flag_off_runs_no_edit_subprocess
+    with_argv_file('FAKE_BACKLOG_ARGV_FILE') do |path|
+      assert_equal 0, run_developer(count: 1)
+
+      records = File.read(path)
+      refute_includes records, 'task|edit|'
+      refute_includes records, '--comment'
+    end
+  end
+
+  def test_flag_on_comments_a_completed_task
+    with_argv_file('FAKE_BACKLOG_ARGV_FILE') do |path|
+      code = run_developer(count: 1, extra: { 'LETSDO_TASK_TIME_COMMENT' => '1' })
+
+      assert_equal 0, code
+      records = File.read(path)
+      assert_includes records, 'task|edit|TASK-1|--comment|letsdo: completed in '
+      assert_includes records, '|--comment-author|@letsdo'
+      assert_includes @err.string, 'letsdo: session:'
+      refute_includes @err.string, 'not written'
+    end
+  end
+
+  def test_edit_failure_is_non_fatal_and_reported
+    with_argv_file('FAKE_BACKLOG_ARGV_FILE') do |path|
+      code = run_developer(count: 1, extra: { 'LETSDO_TASK_TIME_COMMENT' => '1',
+                                              'FAKE_BACKLOG_EDIT_FAIL' => '1' })
+
+      assert_equal 0, code
+      assert_includes File.read(path), 'task|edit|TASK-1'
+      assert_includes @err.string, 'letsdo: cannot write task time comment for TASK-1'
+      assert_includes @err.string, 'letsdo: 1 comment not written'
+      assert_includes @err.string, 'letsdo: session:'
     end
   end
 end

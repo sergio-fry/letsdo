@@ -36,6 +36,7 @@ LETSDO_ROOT  (default: the current working directory)
 | `LETSDO_PROVIDER` | `backlog` | Task provider name used by the loop (currently only `backlog`). |
 | `LETSDO_BACKEND` | `pi` | AI backend that runs each agent (only `pi` today; `LETSDO_PI_COMMAND`/`LETSDO_PI_FLAGS` keep working as before). |
 | `LETSDO_DEBUG` | unset | Set to `1` to trace loop and runner decisions (`[letsdo] loop: ...`) on stderr. |
+| `LETSDO_TASK_TIME_COMMENT` | unset (off) | Set to `1` to append a `letsdo: completed in <time>` comment to each completed task's backlog record at session stop. Off by default: no task file is modified and no extra backlog subprocess runs. |
 
 ### Precedence rules
 
@@ -107,6 +108,10 @@ CI.
 - `LETSDO_DEBUG` — `Letsdo::AgentLoop#initialize` (`lib/letsdo/agent_loop.rb`)
   and `Letsdo::PiRunner#initialize` (`lib/letsdo/pi_runner.rb`); enabled when
   the value is exactly `"1"`.
+- `LETSDO_TASK_TIME_COMMENT` — `Letsdo::Config#task_time_comment?`
+  (`lib/letsdo/config.rb`); enabled only when the value is exactly `"1"`.
+  Consumed by `Letsdo::CLI::Builder#finish_session`, which runs
+  `Letsdo::TaskTimeWriteback` at stop.
 - `TERM` — `Letsdo::CLI#tui?` (`lib/letsdo/cli.rb`).
 
 ## External Requirements (not configurable)

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative 'duration'
 require_relative 'session_recorder/jsonl_writer'
 
 module Letsdo
@@ -52,13 +53,9 @@ module Letsdo
         "letsdo:   #{run.task_id} #{outcome} in #{format_duration(run.elapsed_s)}"
       end
 
+      # Shared with the task-time write-back so summary and task record agree.
       def format_duration(seconds)
-        total = [seconds.to_f, 0.0].max.round
-        minutes, secs = total.divmod(60)
-        return '0s' if minutes.zero? && secs.zero?
-        return "#{secs}s" if minutes.zero?
-
-        "#{minutes}m #{secs}s"
+        Duration.format(seconds)
       end
     end
     include SummaryFormat

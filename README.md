@@ -192,6 +192,7 @@ All knobs are environment variables:
 | `LETSDO_PROVIDER` | `backlog` | Task provider name used by the loop (currently only `backlog`). |
 | `LETSDO_BACKEND` | `pi` | AI backend that runs each agent (only `pi` today; `LETSDO_PI_COMMAND`/`LETSDO_PI_FLAGS` keep working as before). |
 | `LETSDO_METRICS_FILE` | — | Append session metrics as JSON Lines (`session_start`, one `run_finished` per task, `session_stop`) to this path. Unset disables the file. |
+| `LETSDO_TASK_TIME_COMMENT` | unset (off) | Set to `1` to append a `letsdo: completed in <time>` comment to each completed task's backlog record at stop (see the stop summary below). Off by default: no task file is modified and no extra backlog subprocess runs. |
 | `LETSDO_DEBUG` | — | Set to `1` to trace loop decisions on stderr. |
 
 On stop, letsdo prints a session summary to stderr — done / failed /
@@ -213,6 +214,27 @@ event — `session_start`, `run_finished` (`{task, exit, outcome,
 An unwritable path only warns on stderr; the run continues without the
 file. `waiting` is a derived approximation (session time minus run time):
 it also covers polling and backlog reads, not only idle waiting.
+
+### Per-task elapsed in the task record (opt-in)
+
+With `LETSDO_TASK_TIME_COMMENT=1`, letsdo writes the elapsed time back into
+the task record at stop. The write-back is batched after every agent run
+has ended (so it cannot race the agent's own closing edit), re-queries the
+provider once, and comments only exit-0 runs whose task is **no longer
+open** — a task still open after its run is skipped, because calling it
+completed would be wrong. The comment is authored as `@letsdo`:
+
+```
+letsdo: completed in 4m 12s
+```
+
+It runs the configured `LETSDO_BACKLOG_COMMAND` in the project root
+(`backlog task edit <id> --comment '...' --comment-author @letsdo`). A
+missing or renamed task, or a failing command, warns once per task
+(`letsdo: cannot write task time comment for TASK-12: ...`) and the summary
+reports `N comments not written`; the stop path and the exit code are
+unaffected. The flag is off by default, so a normal session never touches
+task files and never spawns an extra backlog process.
 
 The comprehensive reference — every variable with defaults, precedences,
 examples and where each one is read — lives in the
