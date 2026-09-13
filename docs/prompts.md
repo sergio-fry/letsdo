@@ -10,6 +10,7 @@ This guide covers what a good agent prompt contains, what to avoid, and two
 worked examples from this repository's own agents.
 
 - [How letsdo uses the prompt](#how-letsdo-uses-the-prompt)
+- [Optional: per-agent configuration](#optional-per-agent-configuration)
 - [Must-haves](#must-haves)
 - [Anti-patterns](#anti-patterns)
 - [Worked examples](#worked-examples)
@@ -28,6 +29,40 @@ worked examples from this repository's own agents.
   create a prompt (`letsdo <name> --init`).
 - The pipeline is deterministic per run: one run = one agent invocation =
   one task. The prompt defines HOW the agent executes that task.
+
+## Optional: per-agent configuration
+
+A prompt file can open with a YAML front-matter block that sets launch
+parameters for that one agent. The block is optional — a file without it
+behaves exactly as before.
+
+```markdown
+---
+model: anthropic/claude-sonnet-4-5
+---
+
+# Developer agent (developer)
+
+You are a developer agent named developer.
+...
+```
+
+What to know:
+
+- The block must be the very first thing in the file (`---`, the keys, a
+  closing `---`). It is stripped before the prompt reaches the agent, so it
+  never shows up in the system prompt.
+- `model` is the only key used today: it is passed to pi as
+  `--model <name>` for this agent. Leave it out and pi uses its own default
+  model.
+- A `--model` in `LETSDO_PI_FLAGS`/`AGENT_PI_FLAGS` wins over the file, so
+  keep `--model` out of the global flags when you want to choose the model
+  per agent.
+- The block is extensible: unknown keys are parsed and ignored, so new
+  parameters can be added later without breaking existing prompts.
+
+This is the only configuration a *prompt file* carries; everything else is
+an environment variable (see the [configuration reference](config.md)).
 
 ## Must-haves
 
@@ -170,3 +205,5 @@ Before writing `agents/<name>.md`, check:
 - [ ] Style/language conventions for tracked artifacts.
 - [ ] Prohibitions (unassigned work, several tasks per run, ...).
 - [ ] Prompt matches the file name (`<name>.md` ⇄ `@<name>`).
+- [ ] (Optional) Front-matter `model:` is set only when you want a
+      per-agent model — a global `--model` flag overrides it.

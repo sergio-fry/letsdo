@@ -1,7 +1,10 @@
 # letsdo — configuration reference
 
-All letsdo knobs are environment variables. Nothing is configured in files
-(except the prompts themselves, which live in `agents/`).
+Configuration comes from two places: environment variables (everything in
+this reference) and an optional YAML front-matter block at the top of an
+agent's prompt file, `agents/<name>.md` — see
+[Per-agent configuration](#per-agent-configuration-yaml-front-matter).
+Nothing else is configured in files.
 
 ## Project layout
 
@@ -23,7 +26,7 @@ LETSDO_ROOT  (default: the current working directory)
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `LETSDO_ROOT` | current directory | Project root where `agents/` lives (and where the `backlog` CLI finds `backlog/`). |
-| `LETSDO_PI_FLAGS` | unset (no flags) | Extra pi flags, split on whitespace, e.g. `--model anthropic/claude-sonnet-4-5`. |
+| `LETSDO_PI_FLAGS` | unset (no flags) | Extra pi flags, split on whitespace, e.g. `--model anthropic/claude-sonnet-4-5`. A `--model` here overrides the agent's front-matter `model:` (see [Per-agent configuration](#per-agent-configuration-yaml-front-matter)). |
 | `AGENT_PI_FLAGS` | unset | Fallback for `LETSDO_PI_FLAGS` when it is blank (compatibility with the old `bin/agent`). |
 | `LETSDO_PI_COMMAND` | `pi` | The pi command used to run agents; overridable for tests / fake pi. |
 | `AGENT_ASSIGNEE_HANDLE` | `@<name>` | The agent's backlog assignee handle (used verbatim when set). Also injected as the agent's identity in its prompt. |
@@ -54,6 +57,10 @@ LETSDO_ROOT  (default: the current working directory)
   one rule: handle = `@<name>`. The resolved value is both the assignee the
   loop queries the backlog for and the handle letsdo injects into the
   agent's prompt identity.
+- Agent `model` → `LETSDO_PI_FLAGS`/`AGENT_PI_FLAGS`: a `--model` in the
+  flags wins; the agent's front-matter `model:` is used only when the flags
+  carry no `--model`. See
+  [Per-agent configuration](#per-agent-configuration-yaml-front-matter).
 
 ### Examples
 
@@ -72,6 +79,46 @@ export LETSDO_DEBUG=1        # trace loop decisions when diagnosing
 export LETSDO_PI_COMMAND=/opt/pi/bin/pi
 export LETSDO_BACKLOG_COMMAND=~/.local/bin/backlog
 ```
+
+## Per-agent configuration (YAML front matter)
+
+A prompt file may start with a YAML front-matter block that carries launch
+settings for that one agent. The block is optional: a file without it
+behaves exactly as before.
+
+```markdown
+---
+model: anthropic/claude-sonnet-4-5
+---
+
+# Developer agent (developer)
+You are a developer agent named developer.
+...
+```
+
+Rules:
+
+- The block must be the *very first* thing in `agents/<name>.md`: a `---`
+  line, the YAML keys, a closing `---` line. The rest of the file stays the
+  prompt.
+- The front matter is stripped before the file is handed to the agent, so it
+  never appears in the system prompt.
+- `model` is the only key consumed today:
+  - `model: <name>` is passed to pi as `--model <name>` for that agent.
+  - Absent → no `--model` is added and pi uses its own default model.
+  - A missing file, no front matter, or invalid YAML is treated the same as
+    absent: the block is ignored and the run continues.
+- Precedence: a `--model` coming from `LETSDO_PI_FLAGS`/`AGENT_PI_FLAGS`
+  wins over the file's `model:`. If you set a global `--model`, every agent
+  uses it and the front matter is ignored — leave `--model` out of the
+  global flags to select the model per agent.
+- The block is extensible: unknown keys (e.g. `tags:`) are parsed and
+  ignored, so new parameters can be added later without breaking existing
+  prompt files.
+
+Read by `Letsdo::PromptStore#config` (`lib/letsdo/prompt_store.rb`), passed
+to the backend by `Letsdo::Agent#run` (`lib/letsdo/agent.rb`) and applied in
+`Letsdo::Backends::Pi#initialize` (`lib/letsdo/backends/pi.rb`).
 
 ## TERM and TUI selection
 

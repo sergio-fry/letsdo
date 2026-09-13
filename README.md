@@ -59,7 +59,9 @@ generation, any repeatable task flow you can express as assignee + prompt.
 - **Agents as prompt files** — `agents/<name>.md` is the whole identity of
   an agent: role, rules, workflow. Add a file, get an agent. letsdo injects
   the agent's name and backlog assignee handle into the prompt on every
-  launch, so the template only needs role and rules.
+  launch, so the template only needs role and rules. An optional YAML
+  front-matter block in the same file sets per-agent launch settings —
+  today `model:` selects the pi model for that agent.
 - **Built-in default prompt** — an agent starts even without a prompt file:
   it runs on the built-in default prompt (process-only instructions), and
   letsdo announces once where the prompt was looked for and how to create
@@ -135,7 +137,16 @@ cd your-backlog-project
 # create an agent prompt (once)
 letsdo developer --init        # writes agents/developer.md, never runs the agent
 
-# or write agents/developer.md by hand — the file is the agent's instructions
+# or write agents/developer.md by hand — the file is the agent's instructions.
+# It can start with an optional YAML front-matter block that sets per-agent
+# launch settings — today, the pi model:
+#
+#   ---
+#   model: anthropic/claude-sonnet-4-5
+#   ---
+#
+# Without model:, pi's own default model is used. A --model in
+# LETSDO_PI_FLAGS overrides the file.
 
 # run the agent: it works through all open tasks assigned to @developer
 letsdo developer
@@ -206,7 +217,7 @@ All knobs are environment variables:
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `LETSDO_ROOT` | current folder | Project root where `agents/` lives (and where the `backlog` CLI finds `backlog/`). |
-| `LETSDO_PI_FLAGS` | — | Extra pi flags, e.g. `--model anthropic/claude-sonnet-4-5` (split on whitespace). |
+| `LETSDO_PI_FLAGS` | — | Extra pi flags, e.g. `--model anthropic/claude-sonnet-4-5` (split on whitespace). A `--model` here overrides the agent's front-matter `model:`. |
 | `AGENT_PI_FLAGS` | — | Fallback for `LETSDO_PI_FLAGS` (compatibility with the old `bin/agent`). |
 | `LETSDO_PI_COMMAND` | `pi` | The pi command used to run agents; overridable for tests / fake pi. |
 | `AGENT_ASSIGNEE_HANDLE` | `@<name>` | The agent's backlog assignee handle. The one rule: handle = name. Also the handle injected into the agent's prompt identity. |
@@ -342,9 +353,11 @@ common. This repository itself is run by letsdo: `agents/developer.md` and
 - [Usage guide](docs/usage.md) — install, first run, loop semantics,
   the interactive TUI and its keys, exit codes.
 - [Prompt-authoring guide](docs/prompts.md) — what makes a good agent
-  prompt: must-haves, anti-patterns, worked examples.
-- [Configuration reference](docs/config.md) — every environment variable,
-  its default, precedence and where it is read.
+  prompt: must-haves, anti-patterns, per-agent front-matter config, worked
+  examples.
+- [Configuration reference](docs/config.md) — every environment variable
+  and the per-agent YAML front-matter block, their defaults, precedence and
+  where they are read.
 - [Task selection](docs/task-selection.md) — how the next task is chosen,
   the selection criteria and the deterministic-ordering recommendation.
 
