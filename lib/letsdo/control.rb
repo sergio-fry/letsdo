@@ -1,8 +1,11 @@
 # frozen_string_literal: true
 
+require_relative 'control/reader'
+
 module Letsdo
-  # Agent-control primitives shared by the TUI and the orchestrator loop
-  # (TASK-67 control model): pausing between runs.
+  # Agent-control primitives shared by the TUI, the plain-mode reader and
+  # the orchestrator loop (TASK-67 control model): pausing between runs
+  # (PauseGate) and the stdin control reader (Reader).
   module Control
     # A thread-safe pause flag polled by Letsdo::AgentLoop between runs.
     #

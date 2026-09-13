@@ -15,7 +15,7 @@
 #   Letsdo::Loop             - generic orchestrator: tasks → runs → waiting
 #   Letsdo::RetryPolicy      - per-task retry/backoff/give-up policy (used at AgentLoop level)
 #   Letsdo::AgentLoop        - letsdo wiring: provider + agent + signals + messages
-#   Letsdo::Control          - agent-control primitives (PauseGate)
+#   Letsdo::Control          - agent-control primitives (PauseGate, Reader)
 #   Letsdo::Doctor           - `letsdo doctor` environment self-check
 #   Letsdo::Tui              - the interactive TUI (LogBuffer, Metrics,
 #                              Renderer, Terminal, Input, Session)
