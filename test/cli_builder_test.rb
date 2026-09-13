@@ -98,6 +98,28 @@ class CliBuilderTest < Minitest::Test
       assert_equal 1, @err.string.scan('letsdo: no prompt for ghost at ').size
     end
   end
+
+  # Plain mode must not start the control reader for a pipe stdin: the
+  # bytes stay unread and the loop runs to its normal end (TASK-75).
+  def test_plain_mode_does_not_read_a_non_tty_stdin
+    read_io, write_io = IO.pipe
+    write_io.write("q\n")
+    write_io.close
+    code = run_plain_with_pipe_stdin(read_io)
+
+    assert_equal 0, code
+    assert_equal "q\n", read_io.read
+  ensure
+    read_io&.close
+  end
+
+  def run_plain_with_pipe_stdin(read_io)
+    with_project({ 'developer' => 'You are a developer.' }) do |root|
+      code = builder(root, stdin: read_io, env: fake_backlog_env).run('developer')
+      assert_includes @err.string, 'letsdo: no open tasks for developer'
+      code
+    end
+  end
 end
 
 # Provider selection (TASK-58): the builder resolves LETSDO_PROVIDER through

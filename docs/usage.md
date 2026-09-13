@@ -135,6 +135,22 @@ closed — work too) — a running pi child is terminated and the process
 exits with code 0. With `LETSDO_DEBUG=1` the loop additionally traces
 `[letsdo] loop: ...` decisions to stderr.
 
+### Pause and quit in plain mode
+
+When stdin is still a terminal (for example `letsdo developer > run.log`,
+where stdout is redirected but the keyboard is live), plain mode reads the
+same control keys as the TUI:
+
+| Key | Action |
+| --- | --- |
+| `p` | pause/resume: mid-run the running pi child is suspended at the kernel level (SIGSTOP); a second `p` resumes it (SIGCONT). Between runs the next task is held until resume. A no-op when nothing is running |
+| `q` | stop — identical to `Ctrl+C`: the pi child is terminated, the process exits with code 0 |
+
+The control reader writes nothing, so the plain stream stays
+byte-identical (no escape codes, no echoed input). When stdin is **not** a
+terminal (a pipe, `</dev/null`, CI), the reader is never started and the
+loop is stopped only by `SIGINT`/`SIGTERM`/`SIGHUP`.
+
 ## The interactive TUI
 
 When stdout **and** stdin are terminals and `TERM` is not `dumb`, `letsdo
@@ -194,7 +210,8 @@ is what keeps CI and pipes deterministic.
 4. **Wait** — when no tasks are open (or the backlog is unreadable), wait
    the retry interval (10 s by default, see `LETSDO_WAIT_SECONDS`) and
    query again. An unreadable backlog pauses instead of crashing.
-5. **Stop** — `Ctrl+C` / `SIGTERM` / `SIGHUP` (or `q` in the TUI) stops the
+5. **Stop** — `Ctrl+C` / `SIGTERM` / `SIGHUP` (or `q` in the TUI, and on a
+   terminal stdin in plain mode) stops the
    loop immediately: the running pi child is terminated (even when it was
    paused — SIGCONT comes before SIGTERM), the terminal is restored, exit
    code 0.
@@ -203,9 +220,10 @@ The waiting is interruptible — a stop signal unwinds the loop right away
 instead of waiting out the retry interval. A non-zero agent exit code is
 reported but does not stop the loop.
 
-Pause (`p` in the TUI) between runs sets a gate the loop polls before
-starting the next run: while paused, no new task is started even when the
-backlog has open ones; resume lets the queued task run.
+Pause (`p` in the TUI or in plain mode on a terminal stdin) between runs
+sets a gate the loop polls before starting the next run: while paused, no
+new task is started even when the backlog has open ones; resume lets the
+queued task run.
 
 ## Running several agents
 

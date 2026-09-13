@@ -70,6 +70,11 @@ generation, any repeatable task flow you can express as assignee + prompt.
 - **Orchestrator loop** — retries every 10 s (configurable) when there are
   no open tasks, pauses when the backlog is unreadable instead of crashing,
   and stops instantly on `Ctrl+C`.
+- **Pause/quit in plain mode** — when stdin is still a terminal (e.g.
+  `letsdo developer > run.log`), `p` pauses/resumes the running agent and
+  `q` stops it cleanly, exactly like the TUI keys; the byte stream itself
+  stays plain. With a piped stdin the control keys are unavailable and
+  stopping stays signal-only (`Ctrl+C`/`SIGTERM`/`SIGHUP`).
 - **Streaming output** — agent text streams to stdout as it is generated;
   service and tool lines go to stderr with a shared `HH:MM:SS` prefix:
   tool start (`⚙ name: args`) and completion with duration

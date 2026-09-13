@@ -27,9 +27,25 @@ module Letsdo
 
       def run_plain(name, recorder)
         streamer = OutputStreamer.new(stdout: @stdout, stderr: @stderr)
-        agent_loop(name, streamer, stderr: @stderr, metrics: recorder).run
+        agent = agent_for(name, streamer)
+        pause_gate = Control::PauseGate.new
+        reader = plain_control_reader(agent, pause_gate)
+        agent_loop(name, streamer, agent: agent, stderr: @stderr, metrics: recorder,
+                                   pause_gate: pause_gate).run
       ensure
+        reader&.stop
         finish_session(name, recorder)
+      end
+
+      # Plain-mode control (TASK-75): with a terminal stdin the reader maps
+      # p/q to the same actions as the TUI keys — the shared PauseGate plus
+      # the current backend (nil between runs is a no-op). Reader#start is a
+      # no-op when stdin is not a terminal (pipes, CI), so stopping stays
+      # signal-only there. The reader writes nothing, so the plain stream
+      # stays byte-identical.
+      def plain_control_reader(agent, pause_gate)
+        Control::Reader.new(input: @stdin, pause_gate: pause_gate,
+                            runner: -> { agent.backend }).tap(&:start)
       end
 
       # One shared stop path for plain and TUI mode (TASK-69/TASK-70): close

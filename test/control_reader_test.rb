@@ -171,6 +171,14 @@ class ControlReaderGatingTest < Minitest::Test
     write_io&.close
   end
 
+  # A TTY-ish stream that cannot be read line by line (the TUI fake
+  # keyboard) must not be started: plain mode falls back to signal-only.
+  def test_tty_input_without_gets_is_not_started
+    reader = Letsdo::Control::Reader.new(input: FakeTtyIn.new("p\n"))
+
+    assert_nil reader.start
+  end
+
   def test_non_tty_input_consumes_no_bytes
     read_io, write_io = IO.pipe
     write_io.write("p\nq\n")
@@ -202,5 +210,27 @@ class ControlReaderGatingTest < Minitest::Test
     thread.join(1)
 
     assert_equal false, thread.status
+  end
+
+  # The CLI stops the reader when the run ends (TASK-75): stop must end a
+  # thread still blocked on input and tolerate a never-started reader.
+  def test_stop_ends_a_reader_blocked_on_input
+    read_io, = IO.pipe
+    reader = reader_for(read_io)
+    thread = reader.start
+    reader.stop
+
+    refute thread.alive?, 'stop must end the reader thread'
+  ensure
+    read_io&.close
+  end
+
+  def test_stop_is_safe_when_the_reader_never_started
+    read_io, = IO.pipe
+    reader = Letsdo::Control::Reader.new(input: read_io)
+
+    assert_nil reader.stop
+  ensure
+    read_io&.close
   end
 end

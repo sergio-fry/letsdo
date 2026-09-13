@@ -37,9 +37,9 @@ module Letsdo
         @thread = nil
       end
 
-      # Whether the reader may run: stdin must be a terminal, otherwise a
-      # pipe, /dev/null or CI stdin would be read from (and stolen from the
-      # user's pipe).
+      # Whether the reader may run: stdin must be a terminal that can be
+      # read line by line, otherwise a pipe, /dev/null or CI stdin would be
+      # read from (and stolen from the user's pipe).
       #
       # @return [Boolean]
       def available?
@@ -65,10 +65,24 @@ module Letsdo
         @thread&.join(timeout)
       end
 
+      # Ends the reader: kills the background thread when it is still
+      # blocked on input, so no reader outlives the run that started it.
+      # Safe to call when it was never started (non-TTY stdin).
+      #
+      # @return [void]
+      def stop
+        thread = @thread
+        return unless thread
+
+        thread.kill
+        thread.join(1)
+        @thread = nil
+      end
+
       private
 
       def terminal_input?
-        @input.respond_to?(:tty?) && @input.tty?
+        @input.respond_to?(:tty?) && @input.tty? && @input.respond_to?(:gets)
       end
 
       def build_thread

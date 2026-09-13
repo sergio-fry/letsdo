@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Config#assignee_handle` (default `@<name>`, overridable with
   `AGENT_ASSIGNEE_HANDLE`), so the identity an agent reads matches the
   handle its backlog tasks are assigned to (TASK-85).
+- Plain mode now supports the TUI control keys when stdin is a terminal:
+  `p` pauses/resumes the running agent (SIGSTOP/SIGCONT) and `q` stops it
+  cleanly (exit 0), while the output stays a plain byte stream. With a
+  piped or `/dev/null` stdin the reader is never started, so stopping stays
+  signal-only (`SIGINT`/`SIGTERM`/`SIGHUP`) (TASK-75).
 
 ## [0.4.0] - 2026-09-08
 
