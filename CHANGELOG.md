@@ -5,6 +5,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-09-17
+
+### Added
+
+- Deterministic task selection: `Providers::Backlog` now requests
+  `--ready --sort priority` from the backlog CLI and re-sorts the normalized
+  batch in the adapter — In Progress first, then priority
+  High > Medium > Low, then ordinal ascending, then id ascending — so the
+  batch letsdo hands to the loop is the authoritative runnable order and the
+  common divergence between what letsdo reads and what the agent picks
+  disappears. Blocked tasks (unfinished dependencies) are never offered, and
+  the normalized `Task` carries the fields selection needs (`ordinal`,
+  `type`, `labels`, `milestone`) while a growing backlog JSON schema still
+  cannot crash the adapter (TASK-95).
+- `docs/task-selection.md` — how letsdo picks the next task today, the
+  missing-data table, and the recommendation roadmap (TASK-86).
+
+### Changed
+
+- Documentation for per-agent model configuration: `docs/config.md`,
+  `docs/prompts.md` and the README now cover the YAML front-matter agent
+  config block (`model:` and friends) and its interaction with
+  `LETSDO_PI_COMMAND` (TASK-89).
+
 ## [0.5.0] - 2026-09-13
 
 ### Added
