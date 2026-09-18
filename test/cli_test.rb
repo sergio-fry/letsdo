@@ -46,9 +46,10 @@ class CliTest < Minitest::Test
     { 'developer' => 'You are a developer.' }
   end
 
-  def run_developer(scenario: 'open', count: nil, extra: {})
+  def run_developer(scenario: 'open', count: nil, assignee: 'developer', extra: {})
     env = fake_backlog_env(scenario: scenario, count: count,
-                           extra: extra.merge('LETSDO_PI_COMMAND' => fake_pi))
+                           extra: extra.merge('LETSDO_PI_COMMAND' => fake_pi,
+                                              'FAKE_BACKLOG_ASSIGNEE' => assignee))
     run_cli(['developer'], prompts: developer_prompts, env: env, sleeper: stop_on_first_wait)
   end
 
@@ -66,13 +67,14 @@ class CliTest < Minitest::Test
   end
 
   # Records of runs on the built-in default prompt: each must carry the
-  # injected identity of the launched agent (TASK-85).
+  # injected identity of the launched agent (TASK-85; bare assignee since
+  # TASK-96).
   def assert_injected_default_prompt(records, name:)
     assert_equal 2, records.length
     records.each do |record|
       assert_includes record, Letsdo::DefaultPrompt::TEXT
       assert_includes record, "You are the agent `#{name}`"
-      assert_includes record, "assignee handle is `@#{name}`"
+      assert_includes record, "backlog assignee is `#{name}`"
     end
   end
 end
@@ -217,7 +219,9 @@ class CliRunTest < CliTest
 
   def test_missing_prompt_run_still_executes_tasks_with_default_prompt
     with_argv_file('FAKE_PI_ARGV_FILE') do |path|
-      env = fake_backlog_env(scenario: 'open', count: 2, extra: { 'LETSDO_PI_COMMAND' => fake_pi })
+      env = fake_backlog_env(scenario: 'open', count: 2,
+                             extra: { 'LETSDO_PI_COMMAND' => fake_pi,
+                                      'FAKE_BACKLOG_ASSIGNEE' => 'nosuch' })
       code = run_cli(['nosuch'], prompts: {}, env: env, sleeper: stop_on_first_wait)
 
       assert_equal 0, code
@@ -266,10 +270,14 @@ class CliRunTest < CliTest
     end
   end
 
+  # The provider argv carries no --assignee at all (TASK-96): the filter
+  # runs in Ruby after normalization, so a legacy override keeps working.
   def test_assignee_handle_override_env
     with_argv_file('FAKE_BACKLOG_ARGV_FILE') do |path|
       run_developer(count: 1, extra: { 'AGENT_ASSIGNEE_HANDLE' => '@someone' })
-      assert_includes File.read(path), '--assignee|@someone|'
+      argv = File.read(path)
+      refute_includes argv, '--assignee'
+      assert_includes argv, 'task|list|--exclude-status|Done|--ready|--sort|priority|--json'
     end
   end
 
@@ -281,24 +289,29 @@ class CliRunTest < CliTest
   end
 end
 
-# Identity injection into the launched prompt (TASK-85): the handle used for
-# backlog assignment is the handle the agent reads about itself.
+# Identity injection into the launched prompt (TASK-85): the assignee used
+# for backlog matching is the assignee the agent reads about itself (bare
+# name since TASK-96; '@' stays prose notation only).
 class CliIdentityTest < CliTest
-  def test_default_handle_is_the_agent_name
+  def test_default_assignee_is_the_bare_agent_name
     with_argv_file('FAKE_PI_ARGV_FILE') do |path|
       run_developer(count: 1)
-      assert_includes File.read(path), 'assignee handle is `@developer`'
+      prompt = File.read(path)
+      assert_includes prompt, 'backlog assignee is `developer`'
+      assert_includes prompt, "'@developer') is prose notation only"
     end
   end
 
-  # The AGENT_ASSIGNEE_HANDLE override reaches both the provider argv and
-  # the injected prompt, so identity and assignment cannot drift apart.
+  # The AGENT_ASSIGNEE_HANDLE override reaches the injected prompt, so
+  # identity and assignment cannot drift apart (tasks are stored under the
+  # override name via the fixture).
   def test_assignee_handle_override_reaches_the_injected_identity
     with_argv_file('FAKE_PI_ARGV_FILE') do |path|
-      run_developer(count: 1, extra: { 'AGENT_ASSIGNEE_HANDLE' => '@someone' })
+      run_developer(count: 1, assignee: 'someone',
+                    extra: { 'AGENT_ASSIGNEE_HANDLE' => 'someone' })
       prompt = File.read(path)
-      assert_includes prompt, 'assignee handle is `@someone`'
-      refute_includes prompt, 'assignee handle is `@developer`'
+      assert_includes prompt, 'backlog assignee is `someone`'
+      refute_includes prompt, 'backlog assignee is `developer`'
     end
   end
 end

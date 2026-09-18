@@ -176,7 +176,7 @@ class CliBuilderProviderTest < Minitest::Test
 
       assert_equal 0, code
       assert_equal 1, state[:calls]
-      assert_equal ['@developer', 'backlog', root], state[:built_with][0, 3]
+      assert_equal ['developer', 'backlog', root], state[:built_with][0, 3]
       assert_kind_of Hash, state[:built_with][3]
     end
   end

@@ -4,13 +4,20 @@ require_relative '../test_helper'
 require 'tempfile'
 
 module ProvidersBacklogTestHelpers
-  # Runs the provider with FAKE_BACKLOG_SCENARIO/COUNT set for the duration.
-  def call_provider(scenario: nil, count: nil)
-    command = File.expand_path('../fixtures/fake_backlog', __dir__)
+  # Calls the provider with FAKE_BACKLOG_SCENARIO/COUNT set for the
+  # duration. The default handle is the canonical bare name (TASK-96).
+  def call_provider(scenario: nil, count: nil, handle: 'developer')
     vars = {}
     vars['FAKE_BACKLOG_SCENARIO'] = scenario if scenario
     vars['FAKE_BACKLOG_COUNT'] = count.to_s if count
-    with_env(vars) { Letsdo::Providers::Backlog.new(handle: '@developer', command: command, cwd: Dir.pwd).call }
+    with_env(vars) { build_provider(handle: handle).call }
+  end
+
+  # Builds (not calls) a provider, so tests can inspect #assignee_variants
+  # and call #call themselves.
+  def build_provider(handle: 'developer')
+    command = File.expand_path('../fixtures/fake_backlog', __dir__)
+    Letsdo::Providers::Backlog.new(handle: handle, command: command, cwd: Dir.pwd)
   end
 
   # Sets environment variables for the duration of the block and removes
@@ -21,9 +28,11 @@ module ProvidersBacklogTestHelpers
       old[key] = ENV[key]
       ENV[key] = value
     end
-    yield
-  ensure
-    old.each { |key, value| ENV[key] = value }
+    begin
+      yield
+    ensure
+      old.each { |key, value| ENV[key] = value }
+    end
   end
 end
 
@@ -49,7 +58,7 @@ class ProvidersBacklogTest < Minitest::Test
     assert_equal 'Alpha', task.title
     assert_equal 'To Do', task.status
     assert_nil task.priority
-    assert_equal ['@developer'], task.assignees
+    assert_equal ['developer'], task.assignees
   end
 
   def test_selection_fields_are_normalized
@@ -94,21 +103,61 @@ class ProvidersBacklogTest < Minitest::Test
   end
 
   def test_missing_command_returns_nil
-    provider = Letsdo::Providers::Backlog.new(handle: '@developer',
+    provider = Letsdo::Providers::Backlog.new(handle: 'developer',
                                               command: '/nonexistent/backlog', cwd: Dir.pwd)
 
     assert_nil provider.call
   end
 
-  def test_assignee_and_flags_in_command_line
-    command = File.expand_path('../fixtures/fake_backlog', __dir__)
+  # TASK-96: the assignee filter runs in Ruby, not on the CLI line — the
+  # CLI's --assignee is an exact-string match, so notation deviations
+  # ('@developer' vs 'developer') would silently starve the loop.
+  def test_command_line_has_no_assignee_flag
     Tempfile.create('fake_backlog_argv') do |file|
       with_env('FAKE_BACKLOG_ARGV_FILE' => file.path) do
-        Letsdo::Providers::Backlog.new(handle: '@developer', command: command, cwd: Dir.pwd).call
+        build_provider(handle: 'developer').call
       end
-      assert_equal "task|list|--assignee|@developer|--exclude-status|Done|--ready|--sort|priority|--json\n",
+      assert_equal "task|list|--exclude-status|Done|--ready|--sort|priority|--json\n",
                    File.read(file.path)
     end
+  end
+
+  # The canonical default: bare-name tasks are picked up as-is, the legacy
+  # '@'-prefixed and case variants still match, other agents' tasks never.
+  def test_bare_handle_matches_all_notations_and_filters_other_agents
+    provider = build_provider
+    tasks = with_env('FAKE_BACKLOG_SCENARIO' => 'assignees') { provider.call }
+
+    assert_equal %w[TASK-1 TASK-2 TASK-3], tasks.map(&:id)
+    assert_equal %w[@developer Developer], provider.assignee_variants
+  end
+
+  # A legacy '@'-prefixed AGENT_ASSIGNEE_HANDLE override keeps matching the
+  # same tasks (escape hatch), recording the bare/case values as variants.
+  def test_at_prefixed_handle_still_matches_bare_tasks
+    provider = build_provider(handle: '@developer')
+    tasks = with_env('FAKE_BACKLOG_SCENARIO' => 'assignees') { provider.call }
+
+    assert_equal %w[TASK-1 TASK-2 TASK-3], tasks.map(&:id)
+    assert_equal %w[Developer developer], provider.assignee_variants
+  end
+
+  def test_variants_are_empty_for_exact_batches_and_reset_per_call
+    provider = build_provider
+    with_env('FAKE_BACKLOG_SCENARIO' => 'assignees') { provider.call }
+    refute_empty provider.assignee_variants
+
+    with_env('FAKE_BACKLOG_SCENARIO' => 'open') { provider.call }
+    assert_empty provider.assignee_variants
+  end
+
+  # handle: nil is the doctor path: no filtering, no variants recorded.
+  def test_nil_handle_keeps_every_task
+    provider = build_provider(handle: nil)
+    tasks = with_env('FAKE_BACKLOG_SCENARIO' => 'assignees') { provider.call }
+
+    assert_equal %w[TASK-1 TASK-2 TASK-3 TASK-4], tasks.map(&:id)
+    assert_empty provider.assignee_variants
   end
 
   # --ready turns the fake CLI into the readiness filter: blocked tasks

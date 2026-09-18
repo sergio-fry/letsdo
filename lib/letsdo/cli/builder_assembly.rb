@@ -108,8 +108,11 @@ module Letsdo
         handle = opts[:handle] || assignee_handle(name)
         agent = opts[:agent] || agent_for(name, streamer)
         provider = opts[:provider] || provider_for(handle)
+        # The provider object itself (not a wrapping lambda) reaches the loop
+        # so the once-per-run assignee mismatch hint can read its
+        # #assignee_variants (TASK-96).
         AgentLoop.new(name: name, handle: handle, agent: agent,
-                      task_provider: -> { provider.call },
+                      task_provider: provider,
                       wait_seconds: wait_seconds, sleeper: @sleeper, stderr: opts[:stderr],
                       metrics: opts[:metrics], pause_gate: opts[:pause_gate],
                       watcher: backlog_watcher, **retry_options)

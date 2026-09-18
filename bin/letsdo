@@ -31,7 +31,9 @@
 #   LETSDO_ROOT             project root with agents/ (default — current folder)
 #   LETSDO_PI_FLAGS         extra pi flags (e.g. "--model anthropic/claude-sonnet-4-5")
 #   AGENT_PI_FLAGS          the same, for bin/agent compatibility if LETSDO_PI_FLAGS is unset
-#   AGENT_ASSIGNEE_HANDLE   the agent's backlog assignee handle (default "@<name>")
+#   AGENT_ASSIGNEE_HANDLE   the agent's backlog assignee (default <name>,
+#                           the bare name; a legacy '@<name>' value is warned
+#                           about by `letsdo doctor`)
 #   LETSDO_WAIT_SECONDS     retry interval when no tasks are open (default 10)
 #   LETSDO_BACKLOG_COMMAND  the backlog CLI command (default "backlog")
 #   LETSDO_PROVIDER         task provider name (default "backlog")

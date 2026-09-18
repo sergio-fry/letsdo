@@ -32,8 +32,9 @@ platform — the backlog folder is the single source of truth.
   already have everything letsdo needs. The tasks are the instructions;
   letsdo only executes them.
 - **Zero-config team.** A new agent is a new file: `agents/<name>.md`
-  with the agent's instructions. The assignee handle is derived from the
-  name (`@developer` ↔ `developer`), so the agent automatically works on
+  with the agent's instructions. The assignee is derived from the
+  name (`developer` the agent ↔ `developer` the assignee; `@developer`
+  is prose notation only), so the agent automatically works on
   the tasks already assigned to it. No code, no schemas, no setup.
 - **One task per run — honest work.** Each run picks up exactly one open
   task and completes it before the next. No context-switching, no runaway
@@ -53,7 +54,7 @@ generation, any repeatable task flow you can express as assignee + prompt.
 ## Features
 
 - **One-command agent run** — `letsdo <name>` starts the loop: all open
-  tasks assigned to `@<name>` are done one after another (one agent run =
+  tasks assigned to `<name>` are done one after another (one agent run =
   one task), then the loop waits for new ones until stopped with
   `SIGINT/SIGTERM` (clean exit, code 0).
 - **Agents as prompt files** — `agents/<name>.md` is the whole identity of
@@ -94,7 +95,8 @@ generation, any repeatable task flow you can express as assignee + prompt.
   `PATH` — this is the AI backend that runs the agent (`pi --mode json`).
   The command is configurable via `LETSDO_PI_COMMAND`.
 - The Backlog.md CLI (`backlog`) on `PATH` — the task provider reads open
-  tasks via `backlog task list --assignee <handle> --ready --sort priority`.
+  tasks via `backlog task list --exclude-status Done --ready --sort
+  priority --json` and matches the agent's assignee on them.
   Configurable via
   `LETSDO_BACKLOG_COMMAND`.
 
@@ -149,7 +151,7 @@ letsdo developer --init        # writes agents/developer.md, never runs the agen
 # Without model:, pi's own default model is used. A --model in
 # LETSDO_PI_FLAGS overrides the file.
 
-# run the agent: it works through all open tasks assigned to @developer
+# run the agent: it works through all open tasks assigned to developer
 letsdo developer
 ```
 
@@ -221,7 +223,7 @@ All knobs are environment variables:
 | `LETSDO_PI_FLAGS` | — | Extra pi flags, e.g. `--model anthropic/claude-sonnet-4-5` (split on whitespace). A `--model` here overrides the agent's front-matter `model:`. |
 | `AGENT_PI_FLAGS` | — | Fallback for `LETSDO_PI_FLAGS` (compatibility with the old `bin/agent`). |
 | `LETSDO_PI_COMMAND` | `pi` | The pi command used to run agents; overridable for tests / fake pi. |
-| `AGENT_ASSIGNEE_HANDLE` | `@<name>` | The agent's backlog assignee handle. The one rule: handle = name. Also the handle injected into the agent's prompt identity. |
+| `AGENT_ASSIGNEE_HANDLE` | `<name>` | The agent's backlog assignee. The one rule: assignee = name, stored bare (`@` is prose-only notation). Also the assignee injected into the agent's prompt identity. |
 | `LETSDO_WAIT_SECONDS` | 10 | Retry interval when there are no open tasks. |
 | `AGENT_WAIT_SECONDS` | — | Fallback for `LETSDO_WAIT_SECONDS` (`bin/agent-loop` compatibility). |
 | `LETSDO_MAX_RETRIES` | 3 | Max consecutive failed runs of the same task before giving up for the session. |
@@ -336,9 +338,10 @@ bin/letsdo ──► Letsdo::CLI ──► Letsdo::Agent ──► Letsdo::PiRun
   code (including 128+signal).
 - `Letsdo::OutputStreamer` — routes agent text to stdout and service/tool
   lines to stderr with `HH:MM:SS` prefixes and durations.
-- `Letsdo::BacklogTasks` — the task provider: runnable open tasks for a
-  handle via `backlog task list --assignee <handle> --exclude-status Done
-  --ready --sort priority --json`, returned in the authoritative run order
+- `Letsdo::BacklogTasks` — the task provider: runnable open tasks for the
+  assignee via `backlog task list --exclude-status Done --ready --sort
+  priority --json` with the assignee matched in Ruby (tolerating the
+  legacy `@` notation), returned in the authoritative run order
   (In Progress first, then priority High > Medium > Low, then ordinal, then
   id); `nil` when the backlog is unreadable (the loop pauses instead of
   running the agent).
@@ -399,7 +402,7 @@ Ruby 3.3 and 4.0 (satisfies `required_ruby_version: ">= 3.3"`).
 | [aider](https://github.com/Aider-AI/aider) | Pair-programming CLI | Local AI pair for code changes | Focused on interactive coding pairs, not executing a tracked backlog |
 
 What none of them do out of the box: take an existing markdown backlog,
-derive the team from the assignee handles, and execute the tasks one per
+derive the team from the assignees, and execute the tasks one per
 run with an observable loop. That is letsdo's niche — a thin convention
 layer instead of a framework. If your project is tracked in Backlog.md
 format and you want a local, observable, multi-agent worker on top of it,

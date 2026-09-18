@@ -19,7 +19,7 @@ the first task — do not re-sort the list, do not judge importance yourself,
 do not pick by title, interest or size.
 
 1. List your tasks with
-   `backlog task list --assignee @developer --exclude-status Done --sort priority --plain`
+   `backlog task list --assignee developer --exclude-status Done --sort priority --plain`
 2. Take the FIRST task in the list.
 3. Exception: a task already In Progress for you is always taken first,
    even when it is not first in the list.
@@ -33,7 +33,7 @@ Execute the task according to the backlog protocol:
 
 1. **Start**: `backlog instructions task-execution` — study the task, check
    the status and Acceptance Criteria, move the task to In Progress and
-   assign it to yourself (`backlog task edit <ID> -s "In Progress" -a @developer`).
+   assign it to yourself (`backlog task edit <ID> -s "In Progress" -a developer`).
 2. **Study & gather context**: Before making a plan, read thoroughly:
    - the task description and Acceptance Criteria
    - all comments on the task

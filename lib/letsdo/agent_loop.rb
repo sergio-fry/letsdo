@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
 require_relative 'agent_loop/tasks'
+require_relative 'agent_loop/assignee_hints'
 
 module Letsdo
   # The orchestrator loop wired to the real environment for `letsdo <name>`.
   class AgentLoop
     include AgentLoopTasks
+    include AgentLoopAssigneeHints
 
     STOP = :letsdo_stop
     PAUSE_POLL_SECONDS = 0.05
@@ -73,6 +75,7 @@ module Letsdo
       @loop = build_loop
       install_signal_handlers
       @unavailable_hinted = false
+      @variants_hinted = false
     end
 
     def build_retry_policy(opts)

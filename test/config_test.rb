@@ -33,16 +33,24 @@ class ConfigTest < Minitest::Test
     assert_equal [], config({}).pi_flags
   end
 
-  def test_assignee_handle_defaults_to_name
-    assert_equal '@dev', config({}).assignee_handle('dev')
+  def test_assignee_handle_defaults_to_bare_name
+    assert_equal 'dev', config({}).assignee_handle('dev')
   end
 
-  def test_assignee_handle_override
+  def test_assignee_handle_override_is_verbatim
     assert_equal '@x', config('AGENT_ASSIGNEE_HANDLE' => '@x').assignee_handle('dev')
+    assert_equal 'other', config('AGENT_ASSIGNEE_HANDLE' => 'other').assignee_handle('dev')
   end
 
   def test_assignee_handle_blank_override_falls_back
-    assert_equal '@dev', config('AGENT_ASSIGNEE_HANDLE' => '   ').assignee_handle('dev')
+    assert_equal 'dev', config('AGENT_ASSIGNEE_HANDLE' => '   ').assignee_handle('dev')
+  end
+
+  # Raw override accessor for the doctor legacy check (TASK-96).
+  def test_assignee_handle_override_raw
+    assert_nil config({}).assignee_handle_override
+    assert_nil config('AGENT_ASSIGNEE_HANDLE' => ' ').assignee_handle_override
+    assert_equal '@legacy', config('AGENT_ASSIGNEE_HANDLE' => '@legacy').assignee_handle_override
   end
 
   def test_wait_seconds_defaults_to_ten

@@ -3,9 +3,9 @@ id: TASK-76
 title: 'CI: automatic gem release on version tag (build, test, publish to RubyGems)'
 status: To Do
 assignee:
-  - '@human'
+  - human
 created_date: '2026-09-04 09:19'
-updated_date: '2026-09-13 13:29'
+updated_date: '2026-09-18 10:04'
 labels: []
 dependencies: []
 references:
@@ -36,3 +36,13 @@ Publishing letsdo to RubyGems should be a single, repeatable action: push a vers
 <!-- SECTION:NOTES:BEGIN -->
 Assigned to @human (2026-09-13 review): the release needs a RubyGems API key stored as a repository secret plus the publish decision, which only a human can perform. A developer can draft the workflow YAML, but the human owns the secret and the actual release.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: developer
+created: 2026-09-18 10:04
+---
+TASK-96 data migration: stored assignee '@human' reassigned to the canonical bare name 'human' (the '@' prefix is prose-only notation; exact-string filters miss '@'-prefixed values).
+---
+<!-- COMMENTS:END -->

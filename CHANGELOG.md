@@ -5,6 +5,35 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Assignee identity is now the bare agent name (`developer`), not an
+  `@`-prefixed handle. The backlog CLI matches `--assignee` by exact
+  string, so the legacy default made letsdo's own view of the queue
+  diverge from every exact-match consumer. Canonical tracker value is the
+  bare name; `@` stays prose-only notation (TASK-96).
+  - `Providers::Backlog` no longer passes `--assignee` on the CLI line and
+    matches the resolved assignee against stored task assignees in Ruby,
+    tolerating the legacy `@` prefix, surrounding whitespace and case; the
+    matched-not-exact values are exposed as `assignee_variants`.
+  - `AgentLoop` prints a once-per-run stderr hint when a batch matched only
+    after normalization, pointing at the tasks to reassign.
+  - `letsdo doctor` gained an assignee check: WARN on a legacy
+    `@`-prefixed `AGENT_ASSIGNEE_HANDLE` override and on `@`-prefixed
+    assignees stored on open tasks (with the reassignment command).
+  - `AGENT_ASSIGNEE_HANDLE` still works verbatim as an escape hatch.
+- Own backlog data migrated: no open task is stored with an `@`-prefixed
+  assignee anymore.
+
+### Changed
+
+- Docs flipped to bare assignees: AGENTS.md team rules (`-a developer`),
+  agent templates (`agents/developer.md`, `agents/analyst.md`), README,
+  docs/config.md, docs/usage.md, docs/prompts.md, docs/task-selection.md.
+  The TUI header keeps `@name` as display-only notation.
+
 ## [0.6.0] - 2026-09-17
 
 ### Added

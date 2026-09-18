@@ -10,7 +10,7 @@ class AgentLoopTest < Minitest::Test
   def make_loop(provider:, run_one:, **opts)
     stderr = opts[:stderr] || StringIO.new
     loop_obj = Letsdo::AgentLoop.new(
-      name: 'developer', handle: '@developer',
+      name: 'developer', handle: 'developer',
       run_one: run_one, task_provider: provider,
       wait_seconds: opts.fetch(:wait_seconds, 0.5),
       sleeper: opts[:sleeper] || default_sleeper, stderr: stderr,
@@ -18,6 +18,16 @@ class AgentLoopTest < Minitest::Test
       retry_policy: opts[:retry_policy]
     )
     [loop_obj, stderr]
+  end
+
+  # A provider object exposing #assignee_variants (Providers::Backlog
+  # shape, TASK-96) backed by a static, pre-coerced task batch.
+  def variant_provider(tasks, variants)
+    batch = tasks.map { |t| coerce_task(t) }
+    provider = Object.new
+    provider.define_singleton_method(:call) { batch }
+    provider.define_singleton_method(:assignee_variants) { variants }
+    provider
   end
 
   def default_sleeper
@@ -637,5 +647,40 @@ class AgentLoopRetryTest < AgentLoopTest
 
     assert_equal 2, runs.length
     assert_equal 2, policy.failures('TASK-1')
+  end
+end
+
+# Once-per-run assignee mismatch hint (TASK-96): when the provider batch
+# matched only after normalization (legacy '@'-prefixed stored assignees),
+# the loop warns once per run; plain lambda providers never warn.
+class AgentLoopAssigneeVariantTest < AgentLoopTest
+  def test_variant_provider_warns_once_per_run
+    provider = variant_provider([{ id: 'TASK-1', assignees: ['@developer'] }], ['@developer'])
+    sleeper = counting_sleeper(max_sleeps: 3)
+    loop_obj, err = make_loop(provider: provider, run_one: ->(_task) { 0 }, sleeper: sleeper)
+    loop_obj.run
+
+    assert_equal 1, err.string.scan("tasks store assignee(s) '@developer' instead of the handle 'developer'").length
+    assert_includes err.string, "matched after normalization; store 'developer'"
+    assert_includes err.string, 'AGENT_ASSIGNEE_HANDLE'
+  end
+
+  def test_lambda_provider_never_warns
+    # Plain lambda providers have no #assignee_variants — the guard must
+    # skip them silently.
+    provider = once_provider([{ id: 'TASK-1', assignees: ['@developer'] }])
+    loop_obj, err = make_loop(provider: provider, run_one: ->(_task) { 0 })
+    loop_obj.run
+
+    assert_includes err.string, 'has 1 open task'
+    refute_includes err.string, 'instead of the handle'
+  end
+
+  def test_empty_variants_do_not_warn
+    provider = variant_provider([{ id: 'TASK-1', assignees: ['developer'] }], [])
+    loop_obj, err = make_loop(provider: provider, run_one: ->(_task) { 0 })
+    loop_obj.run
+
+    refute_includes err.string, 'instead of the handle'
   end
 end

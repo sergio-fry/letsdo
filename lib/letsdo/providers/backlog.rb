@@ -8,14 +8,22 @@ module Letsdo
   module Providers
     # Task provider for Letsdo::Loop backed by the real backlog CLI:
     #
-    #   backlog task list --assignee <handle> --exclude-status Done \
-    #     --ready --sort priority --json
+    #   backlog task list --exclude-status Done --ready --sort priority --json
     #
     # Returns the runnable tasks assigned to the handle in the
     # authoritative run order (an Array of Letsdo::Providers::Task), or nil
     # when the backlog state is unreadable — the CLI is not on PATH, failed,
     # or its output is not the expected JSON. The loop treats nil as "pause
     # and retry, do not run the agent".
+    #
+    # The assignee filter is applied in Ruby, not via the CLI's --assignee:
+    # the CLI matches the assignee by exact string, so a task stored as
+    # '@developer' (legacy notation) would never reach a '--assignee
+    # developer' query and the loop would silently starve (TASK-96). The
+    # handle match here tolerates the leading '@', surrounding whitespace
+    # and case, so both notations keep working; the literal values that
+    # matched only after normalization are exposed by #assignee_variants
+    # for the doctor WARN and the once-per-run loop hint.
     #
     # The command runs in the project root (cwd), where the backlog CLI finds
     # the backlog/ folder — the same context as a single agent run.
@@ -34,7 +42,10 @@ module Letsdo
       PRIORITY_RANKS = { 'high' => 0, 'medium' => 1, 'low' => 2 }.freeze
       UNKNOWN_RANK = PRIORITY_RANKS.size
 
-      # @param handle [String] assignee handle to filter by (e.g. "@developer")
+      # @param handle [String, nil] assignee name to filter by (canonical:
+      #        'developer'; a legacy '@developer' still matches the same
+      #        tasks); nil disables the filter (doctor inspects all open
+      #        tasks)
       # @param command [String] backlog CLI command (overridable for tests)
       # @param cwd [String, nil] project root for the CLI; nil = inherit cwd
       # @param env [Hash, nil] environment for the CLI child (nil = inherit
@@ -45,6 +56,16 @@ module Letsdo
         @command = command
         @cwd = cwd
         @env = env
+        @assignee_variants = []
+      end
+
+      # Literal assignee values from the last successful batch that matched
+      # the handle only after normalization (e.g. '@developer' for the
+      # handle 'developer') — the mismatch signature the doctor check and
+      # the loop hint surface. Empty when the handle matched exactly, no
+      # handle is configured, or the last call failed.
+      def assignee_variants
+        @assignee_variants.dup
       end
 
       # Reads the runnable open tasks once, in deterministic run order.
@@ -52,12 +73,15 @@ module Letsdo
       # @return [Array<Task>, nil] runnable open tasks; nil when the backlog is
       #         unreadable; empty array when there are no open tasks
       def call
+        @assignee_variants = []
         args = @env ? [@env, *command_line] : command_line
         out, _err, status = Letsdo::Capture.new(*args, chdir: @cwd).run
         return nil unless status.success?
 
         tasks = JSON.parse(out)['tasks']
-        tasks.is_a?(Array) ? sort(tasks.map { |raw| normalize(raw) }) : nil
+        return nil unless tasks.is_a?(Array)
+
+        sort(select_by_assignee(tasks.map { |raw| normalize(raw) }))
       rescue Errno::ENOENT, JSON::ParserError, TypeError
         nil
       end
@@ -75,6 +99,37 @@ module Letsdo
           [in_progress_rank(task), priority_rank(task.priority),
            ordinal_rank(task.ordinal), id_rank(task.id), index]
         end.map(&:first)
+      end
+
+      # Assignee filtering happens here, not in the CLI's --assignee: the
+      # CLI matches by exact string (TASK-96). The stored value may be the
+      # bare canonical name or the legacy '@'-prefixed one — both match.
+      # A nil handle (doctor) keeps every task and never records variants.
+      def select_by_assignee(tasks)
+        return tasks unless @handle
+
+        selected = tasks.select { |task| match_assignees(task) }
+        @assignee_variants = @assignee_variants.uniq.sort
+        selected
+      end
+
+      def match_assignees(task)
+        task.assignees.any? do |value|
+          next false if normalize_assignee(value) != normalized_handle
+
+          @assignee_variants << value unless value == @handle
+          true
+        end
+      end
+
+      def normalized_handle
+        normalize_assignee(@handle)
+      end
+
+      # '@Dev', ' dev ' and 'dev' are the same handle; only the leading '@'
+      # is stripped, so '@dev team' stays distinct from 'devteam'.
+      def normalize_assignee(value)
+        value.to_s.strip.sub(/\A@/, '').downcase
       end
 
       def in_progress_rank(task)
@@ -106,13 +161,14 @@ module Letsdo
         Task.new(**TASK_FIELDS.to_h { |field| [field.to_sym, raw[field]] })
       end
 
-      # [command..., task, list, --assignee <handle>, --exclude-status Done,
-      #  --ready, --sort priority, --json]
+      # [command..., task, list, --exclude-status Done, --ready,
+      #  --sort priority, --json] — no --assignee: the filter runs in Ruby
+      # (select_by_assignee), so exact-match deviations in the stored
+      # assignees cannot starve the loop (TASK-96).
       def command_line
         [
           *Shellwords.split(@command),
           'task', 'list',
-          '--assignee', @handle,
           '--exclude-status', 'Done',
           '--ready',
           '--sort', 'priority',

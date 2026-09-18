@@ -38,11 +38,22 @@ module Letsdo
       Shellwords.split(value)
     end
 
-    # The agent's backlog assignee handle. Default: @<name> (handle = name);
-    # a blank override also falls back to the derived handle.
+    # The agent's backlog assignee name. Default: the bare agent name —
+    # the tracker stores bare names ('developer'); the '@' prefix is
+    # prompt-only notation (TASK-96). AGENT_ASSIGNEE_HANDLE overrides for
+    # legacy setups (used verbatim; a @-prefixed value still matches after
+    # normalization in the provider, but `letsdo doctor` warns about it);
+    # a blank override also falls back to the derived bare name.
     def assignee_handle(name)
-      handle = @env['AGENT_ASSIGNEE_HANDLE']
-      handle && !handle.strip.empty? ? handle : "@#{name}"
+      assignee_handle_override || name.to_s
+    end
+
+    # Raw AGENT_ASSIGNEE_HANDLE (nil when unset or blank) — `letsdo
+    # doctor` uses it to warn about a legacy @-prefixed override instead
+    # of it silently missing every bare-named task.
+    def assignee_handle_override
+      value = @env['AGENT_ASSIGNEE_HANDLE']
+      value && !value.strip.empty? ? value : nil
     end
 
     # Retry interval when no tasks are open. LETSDO_WAIT_SECONDS wins, then
@@ -72,6 +83,14 @@ module Letsdo
     # ENV directly (TASK-71).
     def path
       @env.fetch('PATH', '')
+    end
+
+    # Environment for CLI child processes spawned outside the builder
+    # (the doctor's handle-less provider): the process environment
+    # overlaid with the injected env, so shebang PATH resolution and test
+    # scenario variables both keep working (TASK-96).
+    def child_env
+      ENV.to_h.merge(@env)
     end
 
     # The task provider name. Reads LETSDO_PROVIDER with default 'backlog'.

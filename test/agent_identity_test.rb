@@ -5,23 +5,26 @@ require 'stringio'
 
 # Letsdo::AgentIdentity (TASK-85): the identity block letsdo injects into
 # every agent prompt. Pure string composition — no files, no backends.
+# Since TASK-96 the block presents the bare tracker assignee and marks the
+# '@' prefix as prose notation only.
 class AgentIdentityTest < Minitest::Test
-  def test_preamble_names_the_agent_and_its_handle
-    text = Letsdo::AgentIdentity.preamble(name: 'developer', handle: '@developer')
+  def test_preamble_names_the_agent_and_its_bare_assignee
+    text = Letsdo::AgentIdentity.preamble(name: 'developer', handle: 'developer')
 
     assert_includes text, 'You are the agent `developer`'
-    assert_includes text, 'assignee handle is `@developer`'
+    assert_includes text, 'backlog assignee is `developer`'
+    assert_includes text, "'@developer') is prose notation only"
   end
 
   def test_preamble_ends_with_a_blank_line_separator
-    text = Letsdo::AgentIdentity.preamble(name: 'developer', handle: '@developer')
+    text = Letsdo::AgentIdentity.preamble(name: 'developer', handle: 'developer')
 
     assert text.end_with?("\n\n"), 'identity block must be separated from the prompt'
   end
 
   def test_inject_prepends_the_identity_and_keeps_the_prompt
     prompt = "# Task agent\n\nDo the work.\n"
-    text = Letsdo::AgentIdentity.inject(prompt, name: 'dev', handle: '@dev')
+    text = Letsdo::AgentIdentity.inject(prompt, name: 'dev', handle: 'dev')
 
     assert text.start_with?('# Your identity')
     assert text.end_with?(prompt)
@@ -41,7 +44,7 @@ class AgentIdentityInjectionTest < Minitest::Test
 
     assert prompt.start_with?('# Your identity')
     assert_includes prompt, 'You are the agent `developer`'
-    assert_includes prompt, 'assignee handle is `@developer`'
+    assert_includes prompt, 'backlog assignee is `developer`'
     assert_includes prompt, 'Developer prompt'
   end
 
@@ -54,10 +57,10 @@ class AgentIdentityInjectionTest < Minitest::Test
 
   def test_launcher_supplied_handle_wins
     prompt = injected_prompt(name: 'developer', prompts: { 'developer' => 'Developer prompt' },
-                             handle: '@someone')
+                             handle: 'someone')
 
-    assert_includes prompt, 'assignee handle is `@someone`'
-    refute_includes prompt, 'assignee handle is `@developer`'
+    assert_includes prompt, 'backlog assignee is `someone`'
+    refute_includes prompt, 'backlog assignee is `developer`'
   end
 
   private

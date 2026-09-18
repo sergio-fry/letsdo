@@ -49,6 +49,7 @@ class DoctorTest < Minitest::Test
     assert_line "[ OK ] ruby #{RUBY_VERSION} (>= 3.3)"
     assert_line "[ OK ] pi command found: #{fake_pi}"
     assert_line "[ OK ] backlog command found: #{fake_backlog_script}"
+    assert_line '[ OK ] assignee names are stored bare (canonical)'
     assert_line "[ OK ] project root #{root} has backlog/tasks/"
     assert_line "[ OK ] AGENTS.md present at #{File.join(root, 'AGENTS.md')}"
     assert_line '[ OK ] agents/ present with 1 prompt(s)'
@@ -185,5 +186,39 @@ class DoctorFailureTest < DoctorTest
 
     assert_equal 1, code
     assert_includes @err.string, 'letsdo: unknown option: --badopt'
+  end
+end
+
+# Assignee-name convention check (TASK-96): the tracker stores bare
+# names; a legacy '@'-prefixed override or stored assignee is a WARN,
+# an unreadable backlog skips the check as INFO.
+class DoctorAssigneeTest < DoctorTest
+  def test_legacy_at_prefixed_stored_assignees_warn
+    healthy_root do |root|
+      code = run_doctor(healthy_env(root, 'FAKE_BACKLOG_SCENARIO' => 'assignees'))
+
+      assert_equal 0, code, 'WARN must not fail the report'
+      assert_line("[WARN] tasks store legacy @-prefixed assignee(s): '@developer'" \
+                  ' - reassign them to bare names: backlog task edit <ID> -a <name>')
+    end
+  end
+
+  def test_at_prefixed_handle_override_warns_before_the_stored_scan
+    healthy_root do |root|
+      code = run_doctor(healthy_env(root, 'AGENT_ASSIGNEE_HANDLE' => '@legacy'))
+
+      assert_equal 0, code
+      assert_line("[WARN] AGENT_ASSIGNEE_HANDLE '@legacy' carries the legacy '@' prefix" \
+                  ' - set it to the bare name: AGENT_ASSIGNEE_HANDLE=legacy')
+    end
+  end
+
+  def test_unreadable_backlog_skips_the_check_as_info
+    healthy_root do |root|
+      code = run_doctor(healthy_env(root, 'FAKE_BACKLOG_SCENARIO' => 'fail'))
+
+      assert_equal 0, code, 'INFO must not fail the report'
+      assert_line '[INFO] assignee names not checked - backlog task list failed'
+    end
   end
 end

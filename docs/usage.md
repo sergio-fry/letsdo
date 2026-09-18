@@ -24,7 +24,8 @@ orchestrator loop semantics, and how to run several agents at once.
   (see the [configuration reference](config.md)).
 - The **Backlog.md CLI** (`backlog`) on `PATH` — the task provider reads the
   runnable open tasks assigned to an agent via
-  `backlog task list --assignee <handle> --ready --sort priority`. Override
+  `backlog task list --exclude-status Done --ready --sort priority` (the
+  assignee is matched on the returned tasks; the CLI line stays bare). Override
   with `LETSDO_BACKLOG_COMMAND`.
 
 Tests and the gem build use only Ruby's bundled default gems (Minitest,
@@ -84,7 +85,7 @@ letsdo developer --init           # writes agents/developer.md, never runs the a
 # Option 2: write agents/developer.md by hand
 # (see the prompt-authoring guide for what a good prompt contains)
 
-# Run the agent: it works through all open tasks assigned to @developer
+# Run the agent: it works through all open tasks assigned to developer
 letsdo developer
 ```
 
@@ -207,9 +208,9 @@ is what keeps CI and pipes deterministic.
 
 `letsdo <name>` runs an orchestrator loop:
 
-1. **Query** — fetch all open tasks assigned to `@<name>` via the backlog
-   CLI (the assignee handle comes from `AGENT_ASSIGNEE_HANDLE`, default
-   `@<name>`).
+1. **Query** — fetch all open tasks assigned to `<name>` via the backlog
+   CLI (the assignee comes from `AGENT_ASSIGNEE_HANDLE`, default `<name>`
+   — the canonical bare name; `@<name>` is prose notation only).
 2. **Run** — take the next task and run the agent on it. **One run = one
    task**; the agent must not pick up more than one task per run.
 3. **Repeat** — when a run finishes, query again.
@@ -234,11 +235,11 @@ queued task run.
 ## Running several agents
 
 Agents run as separate processes, each with its own loop and its own
-assignee handle:
+assignee:
 
 ```sh
-letsdo developer &   # works on @developer tasks
-letsdo analyst   &   # works on @analyst tasks
+letsdo developer &   # works on developer tasks
+letsdo analyst   &   # works on analyst tasks
 ```
 
 They coordinate through the shared backlog — nothing else in common. Any

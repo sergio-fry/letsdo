@@ -29,7 +29,9 @@ module Letsdo
                             :current_task, :current_task_seconds, keyword_init: true)
 
       # @param name [String] agent name (CLI argument)
-      # @param handle [String] assignee handle (e.g. "@developer")
+      # @param handle [String] assignee (the bare tracker name, e.g.
+      #        "developer"; the header renders it with the display-only
+      #        '@' prefix)
       # @param clock [Proc] monotonic clock, callable → seconds; injected
       #        in tests
       # @param on_run_start [Proc, nil] called with the task label when a

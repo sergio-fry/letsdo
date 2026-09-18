@@ -18,8 +18,10 @@ LETSDO_ROOT  (default: the current working directory)
 - `LETSDO_ROOT` — project root: `agents/` lives there, and the `backlog`
   CLI resolves `backlog/` there. Default: the folder letsdo was started
   from.
-- The agent's assignee handle is `@<name>` by default — the agent works on
-  tasks assigned to that handle.
+- The agent's assignee is `<name>` by default — the agent works on tasks
+  assigned to that name. The tracker stores bare names; `@<name>` is
+  prose-only notation (`letsdo doctor` warns about legacy `@`-prefixed
+  data).
 
 ## Environment variables
 
@@ -29,7 +31,7 @@ LETSDO_ROOT  (default: the current working directory)
 | `LETSDO_PI_FLAGS` | unset (no flags) | Extra pi flags, split on whitespace, e.g. `--model anthropic/claude-sonnet-4-5`. A `--model` here overrides the agent's front-matter `model:` (see [Per-agent configuration](#per-agent-configuration-yaml-front-matter)). |
 | `AGENT_PI_FLAGS` | unset | Fallback for `LETSDO_PI_FLAGS` when it is blank (compatibility with the old `bin/agent`). |
 | `LETSDO_PI_COMMAND` | `pi` | The pi command used to run agents; overridable for tests / fake pi. |
-| `AGENT_ASSIGNEE_HANDLE` | `@<name>` | The agent's backlog assignee handle (used verbatim when set). Also injected as the agent's identity in its prompt. |
+| `AGENT_ASSIGNEE_HANDLE` | `<name>` | The agent's backlog assignee (used verbatim when set; the bare name is canonical, a legacy `@`-prefixed value still matches but `letsdo doctor` warns). Also injected as the agent's identity in its prompt. |
 | `LETSDO_WAIT_SECONDS` | `10` | Retry interval (seconds) when there are no open tasks. |
 | `AGENT_WAIT_SECONDS` | `10` (via fallback) | Fallback for `LETSDO_WAIT_SECONDS` when it is blank (`bin/agent-loop` compatibility). |
 | `LETSDO_MAX_RETRIES` | `3` | Max consecutive failed runs of the same task before giving up for the session. |
@@ -54,9 +56,12 @@ LETSDO_ROOT  (default: the current working directory)
 - `LETSDO_MAX_RETRIES`: an invalid (non-integer) value falls back to `3`.
 - `LETSDO_RETRY_CAP`: an invalid (non-numeric) value falls back to `300`.
 - `AGENT_ASSIGNEE_HANDLE`: used as-is when set and non-blank; otherwise the
-  one rule: handle = `@<name>`. The resolved value is both the assignee the
-  loop queries the backlog for and the handle letsdo injects into the
-  agent's prompt identity.
+  one rule: assignee = `<name>` (the bare name). The resolved value is both
+  the assignee the loop matches backlog tasks by and the assignee letsdo
+  injects into the agent's prompt identity. The match tolerates the legacy
+  `@` prefix, whitespace and case, so old data keeps working — but the
+  canonical stored value is the bare name, and deviations trigger a
+  once-per-run warning plus a `letsdo doctor` WARN.
 - Agent `model` → `LETSDO_PI_FLAGS`/`AGENT_PI_FLAGS`: a `--model` in the
   flags wins; the agent's front-matter `model:` is used only when the flags
   carry no `--model`. See

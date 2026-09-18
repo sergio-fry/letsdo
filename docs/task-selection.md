@@ -43,9 +43,13 @@ record; scopes B and C remain out of scope.
 End-to-end, one `letsdo <name>` session:
 
 1. `Letsdo::Providers::Backlog` runs
-   `backlog task list --assignee <handle> --exclude-status Done --ready
+   `backlog task list --exclude-status Done --ready
    --sort priority --json` (`lib/letsdo/providers/backlog.rb`,
-   `#command_line`). `--ready` drops tasks whose dependencies are not all
+   `#command_line`) — the CLI line carries no `--assignee` (backlog CLI
+   matches it by exact string, which made notation drift invisible) — and
+   matches the agent's assignee on the returned tasks in Ruby
+   (`#normalized` comparison of the stored values against the resolved
+   handle). `--ready` drops tasks whose dependencies are not all
    done; `--sort priority` orders by priority then ordinal as a first pass.
 2. The adapter projects each raw task onto `TASK_FIELDS =
    %w[id title status priority assignees ordinal type labels milestone]` and
@@ -65,7 +69,7 @@ End-to-end, one `letsdo <name>` session:
    prepends the injected identity and hands the prompt to pi. The prompt is
    what chooses the task: `agents/analyst.md` and `agents/developer.md`
    instruct the agent to run
-   `backlog task list --assignee @<name> --exclude-status Done --sort priority --plain`
+   `backlog task list --assignee <name> --exclude-status Done --sort priority --plain`
    and take the first task, with the "already In Progress first" and "if
    blocked, take the blocker" exceptions.
 6. Retry state lives in `Letsdo::RetryPolicy` and is keyed on the **batch
@@ -81,8 +85,9 @@ batch is only a run counter. The order letsdo read does not govern the work.
 A deterministic selector needs these inputs, in this order:
 
 1. **Eligibility**
-   - assignee contains the agent's handle (`Config#assignee_handle`, default
-     `@<name>`); other agents' and `@human` tasks are never auto-run.
+   - assignee contains the agent's assignee (`Config#assignee_handle`,
+     default `<name>`, the canonical bare name); other agents' and `human`
+     tasks are never auto-run.
    - `status != Done`.
    - not in retry cooldown and not given up for this session
      (`RetryPolicy#cooldown?` / `#gave_up?`).
@@ -149,7 +154,7 @@ A deterministic selector needs these inputs, in this order:
   current batch drains. Acceptable for short runs; note it if runs get long.
 - **Race conditions.** Unassigned tasks are a coordination gap: two agents can
   pick the same task. The design's answer is assignment by a human
-  (`@developer`, `@analyst`, `@human`), not a lock. A lock/claim mechanism
+  (`developer`, `analyst`, `human`), not a lock. A lock/claim mechanism
   would require shared mutable state and belongs to scope C, not here.
 - **Retry interaction.** Any selector must compose with `RetryPolicy`: a task
   in cooldown or given up must not be re-offered, and the outcome must be

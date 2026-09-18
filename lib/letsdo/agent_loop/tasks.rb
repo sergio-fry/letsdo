@@ -15,6 +15,7 @@ module Letsdo
         tasks = @task_provider.call
         return provider_unavailable if tasks.nil?
 
+        report_assignee_variants
         reconcile_attempts(tasks)
         filtered = reject_cooled_down(tasks)
         @metrics&.provider_result(filtered.length)
@@ -31,7 +32,9 @@ module Letsdo
 
       debug("provider: #{tasks.length} open task(s)")
       @stderr.puts("letsdo: #{@name} has #{tasks.length} open task(s)")
-      report_backoff(raw - tasks.length) if raw && raw > tasks.length
+      return unless raw && raw > tasks.length
+
+      @stderr.puts("letsdo: #{raw - tasks.length} open task(s) in retry backoff")
     end
 
     def report_empty(raw)
@@ -43,12 +46,6 @@ module Letsdo
         debug('provider: no open tasks')
         @stderr.puts("letsdo: no open tasks for #{@name}, retrying in #{@wait_seconds}s")
       end
-    end
-
-    def report_backoff(skipped)
-      return unless skipped.positive?
-
-      @stderr.puts("letsdo: #{skipped} open task(s) in retry backoff")
     end
 
     def provider_unavailable

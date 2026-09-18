@@ -22,16 +22,17 @@ module Letsdo
     #        vocabulary.
     # @param streamer [OutputStreamer] where to print output (by default
     #        the real stdout/stderr)
-    # @param handle [String, nil] the agent's backlog assignee handle
-    #        (Config#assignee_handle). Defaults to @<name>; the launcher
-    #        passes the resolved handle so the injected identity always
-    #        matches the handle the backlog tasks are assigned to.
+    # @param handle [String, nil] the agent's backlog assignee
+    #        (Config#assignee_handle). Defaults to the bare <name>
+    #        (TASK-96); the launcher passes the resolved assignee so the
+    #        injected identity always matches what the backlog tasks are
+    #        assigned to.
     def initialize(name:, root:, backend_factory:, streamer: nil, handle: nil)
       @name = name
       @root = root
       @backend_factory = backend_factory
       @streamer = streamer || OutputStreamer.new
-      @handle = handle || "@#{name}"
+      @handle = handle || name.to_s
     end
 
     # The backend of the last/current run -- lets the orchestrator

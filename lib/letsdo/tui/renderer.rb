@@ -66,9 +66,17 @@ module Letsdo
       end
 
       def self.header_line(metrics, width)
-        title = "letsdo · #{metrics.name} (#{metrics.handle})"
+        title = "letsdo · #{metrics.name} (#{display_handle(metrics)})"
         timer = "session #{Text.format_duration(metrics.session_seconds)}"
         Text.fit_line_with_right(title, timer, width)
+      end
+
+      # The header keeps the historical "name (@assignee)" look: the '@'
+      # is display notation only (TASK-96) — the tracker value is the bare
+      # name, and a legacy @-prefixed handle is shown as stored.
+      def self.display_handle(metrics)
+        handle = metrics.handle.to_s
+        handle.start_with?('@') ? handle : "@#{handle}"
       end
 
       # The state line: done/left plus either the running task with its

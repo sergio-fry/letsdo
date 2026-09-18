@@ -28,9 +28,14 @@
 #                                        for the deterministic sort;
 #                            blocked   — one ready, one blocked (unfinished
 #                                        dependency) and one ready task;
+#                            assignees — bare, legacy '@'-prefixed, case-variant
+#                                        and other-agent tasks (TASK-96);
 #                            fail      — exit 1 with an error on stderr;
 #                            malformed — stdout is not JSON.
 #   FAKE_BACKLOG_COUNT       number of tasks in the open scenario (default 2).
+#   FAKE_BACKLOG_ASSIGNEE     assignee stored on open/order/blocked tasks
+#                            (default 'developer') — lets a test launch any
+#                            agent name and still match tasks.
 #   FAKE_BACKLOG_DONE_FILE   path: if the file exists, the open scenario
 #                            turns into empty — tasks were already served
 #                            once (for "N tasks → N runs, then wait" loops).
@@ -62,15 +67,19 @@ end
 
 scenario = ENV.fetch('FAKE_BACKLOG_SCENARIO', 'open')
 count = Integer(ENV.fetch('FAKE_BACKLOG_COUNT', '2'))
+assignee = ENV.fetch('FAKE_BACKLOG_ASSIGNEE', 'developer')
 
 titles = %w[Alpha Beta Gamma Delta Epsilon]
 ready_only = ARGV.include?('--ready')
 
-# One task in the full real schema, with the sort inputs varied by the caller.
-def order_task(id, title, status, priority, ordinal)
+# One task in the full real schema, with the sort inputs varied by the
+# caller (spec = [id, title, status, priority, ordinal]). Assignees use
+# the canonical bare name (TASK-96).
+def order_task(spec, assignee)
+  id, title, status, priority, ordinal = spec
   {
     'id' => id, 'title' => title, 'status' => status, 'priority' => priority,
-    'assignees' => ['@developer'], 'type' => 'task', 'labels' => [],
+    'assignees' => [assignee], 'type' => 'task', 'labels' => [],
     'milestone' => nil, 'parentTaskId' => nil, 'ordinal' => ordinal,
     'dependencies' => []
   }
@@ -94,7 +103,7 @@ tasks = case scenario
               'status' => 'To Do',
               'type' => 'task',
               'priority' => nil,
-              'assignees' => ['@developer'],
+              'assignees' => [assignee],
               'reporter' => nil,
               'labels' => [],
               'milestone' => nil,
@@ -107,24 +116,42 @@ tasks = case scenario
         when 'empty'
           []
         when 'order'
-          [order_task('TASK-A', 'Low', 'To Do', 'low', 10),
-           order_task('TASK-B', 'HighLate', 'To Do', 'high', 30),
-           order_task('TASK-C', 'HighEarly', 'To Do', 'high', 20),
-           order_task('TASK-D', 'HighEarlyTie', 'To Do', 'high', 20),
-           order_task('TASK-E', 'InProgressLow', 'In Progress', 'low', 99),
-           order_task('TASK-F', 'NoPriority', 'To Do', nil, 1)]
+          [['TASK-A', 'Low', 'To Do', 'low', 10],
+           ['TASK-B', 'HighLate', 'To Do', 'high', 30],
+           ['TASK-C', 'HighEarly', 'To Do', 'high', 20],
+           ['TASK-D', 'HighEarlyTie', 'To Do', 'high', 20],
+           ['TASK-E', 'InProgressLow', 'In Progress', 'low', 99],
+           ['TASK-F', 'NoPriority', 'To Do', nil, 1]].map { |spec| order_task(spec, assignee) }
         when 'blocked'
           [{ 'id' => 'TASK-1', 'title' => 'Ready', 'status' => 'To Do',
-             'priority' => 'high', 'assignees' => ['@developer'], 'ordinal' => 1,
+             'priority' => 'high', 'assignees' => [assignee], 'ordinal' => 1,
              'dependencies' => [] },
            { 'id' => 'TASK-2', 'title' => 'Blocked', 'status' => 'To Do',
-             'priority' => 'high', 'assignees' => ['@developer'], 'ordinal' => 2,
+             'priority' => 'high', 'assignees' => [assignee], 'ordinal' => 2,
              'dependencies' => ['TASK-1'] },
            { 'id' => 'TASK-3', 'title' => 'ReadyLow', 'status' => 'To Do',
-             'priority' => 'low', 'assignees' => ['@developer'], 'ordinal' => 3,
+             'priority' => 'low', 'assignees' => [assignee], 'ordinal' => 3,
+             'dependencies' => [] }]
+        when 'assignees'
+          # Assignee-notation matrix (TASK-96): the canonical bare name, the
+          # legacy '@'-prefixed form, a case variant, and another agent's
+          # task. The provider matches the first three for handle
+          # 'developer' and records the non-exact ones as variants.
+          [{ 'id' => 'TASK-1', 'title' => 'Bare', 'status' => 'To Do',
+             'priority' => 'high', 'assignees' => ['developer'], 'ordinal' => 1,
+             'dependencies' => [] },
+           { 'id' => 'TASK-2', 'title' => 'AtLegacy', 'status' => 'To Do',
+             'priority' => 'high', 'assignees' => ['@developer'], 'ordinal' => 2,
+             'dependencies' => [] },
+           { 'id' => 'TASK-3', 'title' => 'CaseVariant', 'status' => 'To Do',
+             'priority' => 'high', 'assignees' => ['Developer'], 'ordinal' => 3,
+             'dependencies' => [] },
+           { 'id' => 'TASK-4', 'title' => 'OtherAgent', 'status' => 'To Do',
+             'priority' => 'high', 'assignees' => ['analyst'], 'ordinal' => 4,
              'dependencies' => [] }]
         when 'sparse'
-          [{ 'id' => 'TASK-1' }, { 'title' => 'No id here' }]
+          [{ 'id' => 'TASK-1', 'assignees' => ['developer'] },
+           { 'title' => 'No id here', 'assignees' => ['developer'] }]
         when 'weird'
           ['not-a-task']
         when 'fail'
