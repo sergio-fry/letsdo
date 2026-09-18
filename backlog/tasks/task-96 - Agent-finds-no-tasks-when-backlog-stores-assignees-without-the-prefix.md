@@ -7,7 +7,7 @@ status: Done
 assignee:
   - developer
 created_date: '2026-09-18 08:07'
-updated_date: '2026-09-18 10:06'
+updated_date: '2026-09-18 10:30'
 labels: []
 dependencies: []
 references:
@@ -52,10 +52,12 @@ Fix scope:
 
 <!-- SECTION:NOTES:BEGIN -->
 Docs flip complete (step 7): AGENTS.md team rules rewritten around bare names + new bare-canonical rule; agents/developer.md and agents/analyst.md command examples now --assignee developer / -a developer / --comment-author analyst; README (features, env table, provider description, niche paragraph); docs/config.md (default, env table, resolution order), docs/usage.md (provider line, loop query, TUI header note, multi-agent section), docs/prompts.md (identity injection, checklist), docs/task-selection.md (provider step explains Ruby-side matching and why the CLI line carries no --assignee). CHANGELOG: new [Unreleased] Fixed/Changed section. RuboCop: extracted AgentLoopAssigneeHints concern (lib/letsdo/agent_loop/assignee_hints.rb) to keep AgentLoopTasks under the module-length limit; folded report_backoff into report_provider. Manual verification against the real repo backlog: provider resolves handle 'developer', returns TASK-96 (stored bare), assignee_variants == []. Doctor live run flagged open TASK-76 stored as '@human' (WARN) -> migrated via 'backlog task edit TASK-76 -a human' -> doctor now [ OK ] assignee names are stored bare (canonical). Open-task sweep: no open task carries an @-prefixed assignee; Done/archived history (e.g. TASK-40, archive TASK-57/61) intentionally left as-is per the leave-history-as-is convention, and the doctor check deliberately scopes to open tasks (the only ones the loop reads). rake test: 421 runs, 1227 assertions, 0 failures, 0 errors. RuboCop: 84 files, 0 offenses.
+
+Release-pass validation (2026-09-18): reproduced the doctor legacy WARN on an @-prefixed stored assignee, migrated TASK-96 back to bare via CLI, doctor OK; live provider batch with handle developer returns [TASK-96], assignee_variants empty; rake test 421 runs / 1223 assertions / 0 failures; RuboCop 84 files, 0 offenses. Done/archived tasks keep legacy @ assignees by design (documented in the fix commit).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Fixed the bare-assignee canonical form (TASK-96). Config#assignee_handle now defaults to the bare agent name; AGENT_ASSIGNEE_HANDLE stays as a verbatim escape hatch. Providers::Backlog dropped --assignee from the CLI line (backlog matches it by exact string, which made notation drift invisible) and matches the resolved assignee in Ruby, tolerating the legacy @ prefix, whitespace and case; matched-not-exact values surface as assignee_variants. AgentLoop prints a once-per-run stderr hint when a batch matched only after normalization. Doctor gained an assignee check: WARN on a legacy @-prefixed override or stored assignees (with the reassignment command), INFO when the backlog is unreadable, OK otherwise. Identity block presents the bare assignee; TUI header keeps @name as display-only notation. Docs flipped to bare names across AGENTS.md, agents/*.md, README, docs/config.md, docs/usage.md, docs/prompts.md, docs/task-selection.md, CHANGELOG. letsdo backlog data migrated via the CLI: TASK-96 @developer->developer, TASK-76 @human->human; open tasks verified clean, Done/archived history left as-is. Verified with: live provider run (bare handle finds TASK-96, variants empty), live doctor run (WARN before migration, OK after), rake test 421 runs / 0 failures, RuboCop 84 files / 0 offenses.
+Providers::Backlog no longer passes --assignee to the backlog CLI (exact-string match) and filters the normalized batch in Ruby, tolerating legacy @-prefix/whitespace/case variants; Config#assignee_handle defaults to the bare agent name with AGENT_ASSIGNEE_HANDLE as a verbatim escape hatch; AgentLoop prints a once-per-run stderr hint on normalization-only matches; doctor WARNs on legacy @-prefixed override or stored assignees; the identity block presents the bare name while the TUI keeps @name as display-only notation; docs and templates flipped (AGENTS.md, agents/*.md, README, docs/*); open backlog tasks migrated via the CLI (Done/archived history left as-is). Verified live: provider run with handle developer finds bare-stored TASK-96 with empty variants; doctor WARN-to-OK across a real legacy reassignment; rake test 421 runs / 0 failures; RuboCop 84 files / 0 offenses.
 <!-- SECTION:FINAL_SUMMARY:END -->
