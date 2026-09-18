@@ -392,6 +392,25 @@ Cleanliness is enforced by the CI workflow
 (`.github/workflows/ci.yml`): gem build + `rake test` on every push,
 Ruby 3.3 and 4.0 (satisfies `required_ruby_version: ">= 3.3"`).
 
+### Releasing
+
+A release is a single action: push a version tag. Bump
+`lib/letsdo/version.rb`, add a CHANGELOG entry, commit, then tag the
+commit and push the tag:
+
+```sh
+git tag v0.7.0
+git push origin v0.7.0
+```
+
+The release workflow (`.github/workflows/release.yml`) does the rest:
+it verifies the tag matches `lib/letsdo/version.rb` (a mismatch fails
+the release before anything is published), builds the gem, runs
+`rake test`, and pushes the gem built in that same run to
+rubygems.org. Publishing uses an API key from the `RUBYGEMS_API_KEY`
+repository secret, which the project owner configures once in the
+GitHub repository settings.
+
 ## Alternatives
 
 | Tool | What it is | What's similar | What's different |

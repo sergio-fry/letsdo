@@ -1,0 +1,64 @@
+# Release for the letsdo gem.
+#
+# A release is a single action: push a version tag (v0.1.0, v0.2.0, ...).
+# The workflow turns tag creation into the full release:
+#   1. Tag check: the tag version matches lib/letsdo/version.rb. A
+#      mismatch (tag v0.2.0 while VERSION is 0.1.0) fails the release
+#      with a clear error before anything is built or published.
+#   2. Build: the gem assembles cleanly (gem build letsdo.gemspec).
+#   3. Tests: rake test ends with 0 failures, 0 errors. CI runs on
+#     branch pushes only, so this is the test gate for the tagged
+#     revision itself.
+#   4. Publish: the gem built in this same run is pushed to rubygems.org
+#      (gem push) with an API key from the RUBYGEMS_API_KEY repository
+#      secret — never a locally built file. The secret is owned and
+#      configured by the maintainer.
+#
+# Like CI, the workflow runs on a clean Ruby — no bundle install; rake
+# and minitest ship as default gems.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+
+      - name: Verify tag matches lib/letsdo/version.rb
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          gem_version="$(ruby -r ./lib/letsdo/version -e 'puts Letsdo::VERSION')"
+          if [ "$tag_version" != "$gem_version" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match lib/letsdo/version.rb (${gem_version}). Bump VERSION (or re-tag) so the tag and the gem version agree, then push the tag again."
+            exit 1
+          fi
+          echo "Tag ${GITHUB_REF_NAME} matches lib/letsdo/version.rb (${gem_version})."
+
+      - name: Build gem
+        run: gem build letsdo.gemspec
+
+      - name: Run tests
+        run: rake test
+
+      # GEM_HOST_API_KEY is the canonical env var `gem push` reads the API
+      # key from; it is fed from the RUBYGEMS_API_KEY repository secret.
+      # The pushed file is the exact letsdo-<version>.gem built above in
+      # this run (the tag/version check already guaranteed the name).
+      - name: Publish to rubygems.org
+        run: gem push "letsdo-${GITHUB_REF_NAME#v}.gem"
+        env:
+          GEM_HOST_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
